@@ -1,0 +1,8 @@
+VA/Fairfax/Safeway:xxx|yyy	0	1	-1	-1	1	-1	-1	-1
+VA/Fairfax/GMU/EEC:xxx|yyy	1	0	1	-1	1	-1	-1	-1
+VA/Fairfax/GMU/CS:1R153AN|Irisean	-1	1	0	1	-1	1	1	-1
+VA/Fairfax/GMU/SWE:xxx|yyy	-1	-1	1	0	-1	-1	-1	1
+VA/Springfield:xxx|yyy	1	1	-1	-1	0	-1	-1	-1
+VA/Fairfax/GMU:xxx|yyy	-1	-1	1	-1	-1	0	1	-1
+VA/Fairfax/GMU:xxx|yyy	-1	-1	1	-1	-1	1	0	1
+VA/Fairfax:xxx|yyy	-1	-1	-1	1	-1	-1	1	0
