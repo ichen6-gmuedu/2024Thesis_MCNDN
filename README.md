@@ -29,7 +29,7 @@ Install python via the python website. https://www.python.org/downloads/
 Install Android SDK via the android SDK website. The version tested for this simulation is Studio Koala Feature Drop | 2024.1.2 .  
 https://developer.android.com/studio/archive
 
-First, select start a new project. This can be done under the file tab on the upper right, or it should be immediately recommended once it is installed.
+After installation, select start a new project. This can be done under the file tab on the upper right, or it should be immediately recommended once it is installed.
 
 Next, select a "Phone and Tablet" template that supports Java. This simulation uses "Empty Views Activity" template. Select the template, and then select "Java" in the language dropdown menu. Rename the project to "phone". 
 
