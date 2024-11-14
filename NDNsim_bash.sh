@@ -11,8 +11,8 @@ IPERF_TEST=("False" "False")
 LOGGING="False"
 
 
-for i in $(seq 0 1);
+for i in $(seq 0 ${#TOPFILE[@]});
 do
-python3 Client_NDN.py -tp "${TOPFILE[$i]}" -wp "${WEIGHTFILE[$i]}" -pgn "${PLTGEN_NUM[$i]}" -to "${TIMEOUT[$i]}" -pnco "${PHONE_NODE_CONNECT_ORDER[$i]}" -v "${VELOCITY[$i]}" -d "${DELTA[$i]}" -pt "${PHONE_TEST[$i]}" -ipt "${IPERF_TEST[$i]}" -l "$LOGGING"
+python3 NDNsim.py -tp "${TOPFILE[$i]}" -wp "${WEIGHTFILE[$i]}" -pgn "${PLTGEN_NUM[$i]}" -to "${TIMEOUT[$i]}" -pnco "${PHONE_NODE_CONNECT_ORDER[$i]}" -v "${VELOCITY[$i]}" -d "${DELTA[$i]}" -pt "${PHONE_TEST[$i]}" -ipt "${IPERF_TEST[$i]}" -l "$LOGGING"
 
 done

@@ -696,7 +696,7 @@ def readargs():
 		help = "Toggle to determine whether the simulation will generate dummy data or generate \
 		data via iperf3. Default is False.")
 	p.add_argument("-l", "--logging", type = str, default = False,
-		help = "Toggle to determine whether all logging information will be printed. Default is True.")
+		help = "Toggle to determine whether all logging information will be printed. Default is False.")
 		
 	args = p.parse_args()
 	
