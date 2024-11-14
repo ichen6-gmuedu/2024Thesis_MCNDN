@@ -7,6 +7,7 @@
  	- Android SDK Installation
  	- iperf3 Installation
  - Running
+ 	- Configuring For Android Device
  	- Configuring bash script
 
 ## Project Description
@@ -55,13 +56,29 @@ The program NDNsim.py contains 10 parameters for the NDN simulator.
 | -pgn, --pktgen_num	| 5	| When generating dummy data, determines how many data packets to generate. |
 | -to, --timeout"	| 5	| Deadline to resend for packets if you dont receive in timeout amount of seconds. timeout scenario: data packet is dropped before delta/linger has expired, we want to resend so we might be able to get the data before delta/linger expires. |
 | -pnco, --phone_node_connect_order	| 4, 7, 4	| The Pattern in which the mobile consumer will disconnect and re-connect to nodes in the topology. Eg, the default: 4, 7, 4 means the MC will connect to node 4, then disconnect from node 4 and connect to node 7, then disconnect from node 7 and connect to node 4. It will stay there until the simulation ends. Must be the same length as velocity. |
-| -v, --velocity	| 100, 100, 100	| The MC's velocity at each gateway connection. Eg, the default: .1, .1, .1 means that at each node the mobile consumer is connecting to, they are travelling at a speed of 0.1 . Must be the same length as phone_node_connect_order |
+| -v, --velocity	| 100, 100, 100	| The MC's velocity at each gateway connection. Eg, the default: .1, .1, .1 means that at each node the mobile consumer is connecting to, they are travelling at a speed of 0.1. For the simplicity of this simulator, this value will be the same as linger time, which is the deadline in which the Mobile Consumer must receive the data before moving to the next gateway. Must be the same length as phone_node_connect_order |
 | -d, --delta	| .1, .1, 100	| The deadline in seconds before the data expires and we are no longer interested. Eg, the default: .1, .1, 100 means that the data packet must be received by the MC before .1 seconds before the MC moves and the interest is re-sent, this happens again at the re-connection, and finally sits for 100 seconds until the data is received. |
 | -pt, --phone_test	| False	| Toggle to determine whether the simulation will connect to the Android Phone to receive the initial interest packet and send final data. |
 | -ipt, --iperf_test	| False	| Toggle to determine whether the simulation will generate dummy data or generate data via iperf3. |
 | -l, --logging	| False	| Toggle to determine whether all logging information will be printed. |
 
 To run, you can simply use ```python3 NDNsim.py``` or optionally use the cli.
+
+### Configuring For Android Device
+
+To run with the Android Device, first run the Android application using the debugging button or run button on Android SDK. It should have an IP port, and "Not Connected" on the top of screen with a button that says "SEND INTEREST" at the bottom. 
+
+The IP may be different depending on your network connection, so please modify `NDNsim.py` line 17 to reflect the IP displayed on your Android Device. It should be noted that simply 'localhost' will not work.
+
+`phone_ip =  '192.168.1.207'`
+
+Next, run the python code with the phone_test option on
+
+`python3 NDNsim.py -pt True`
+
+Now, unless you are waiting for iperf3 to generate data, the text on the Android App should read "Connected". Now that it is connected, tap the "SEND INTEREST" button to begin the NDN simulator.
+
+Once the simulator is complete, you should see the requested data displayed on the phone screen. This may be dummy data (The numbers 1, 2, 3, 4, 5) or the generated iperf3 data.
 
 ### Configuring bash script
 
