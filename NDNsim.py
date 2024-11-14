@@ -886,9 +886,9 @@ if __name__ == "__main__":
 		# break when last element of listed delta/linger is reached. 
 		
 		if curr_time >= end_time:
-			print("Delta time exceeded!")
+			print("Delta time exceeded! Interest has failed!")
 			timestamp.append("Delta Timeout: " + str(delta[counter_x]))
-			counter_x = counter_x + 1 #if the timeout was from delta, go to next
+			counter_x = counter_x + 0 #if the timeout was from delta, DONT go to next gateway
 			timeout_counter = timeout_counter + 1
 			timeout_time.append(end_time)
 			if counter_x >= len(delta):

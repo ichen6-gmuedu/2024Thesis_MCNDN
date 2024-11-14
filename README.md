@@ -15,7 +15,7 @@ This project is a simulation for NDN with a mobile consumer. This simulation is 
 
 This simulation acts as a generalizable model for consumer mobility in NDN utilizing a mobility function to do proactive caching. 
 
-This simulation is created and tested in Linux only.
+This simulation is created and tested in Linux and Android SDK only.
 
 ## Installation
 
@@ -32,7 +32,7 @@ First, select start a new project. This can be done under the file tab on the up
 
 Next, select a "Phone and Tablet" template that supports Java. This simulation uses "Empty Views Activity" template. Select the template, and then select "Java" in the language dropdown menu. Rename the project to "phone". 
 
-Next, replace the contents of app/res/layout/activity_main.xml , app/java/com.example/phone/MainActivity.java , and app/manifests/AndroidManifest.xml with the corresponding three files in this repo: activity_main.xml, MainActivity.java, AndroidManifest.xml. 
+Next, replace the contents of `app/res/layout/activity_main.xml` , `app/java/com.example/phone/MainActivity.java` , and `app/manifests/AndroidManifest.xml` in the Android SDK project files with the corresponding three files in this repo: `activity_main.xml`, `MainActivity.java`, `AndroidManifest.xml`. 
 
 This implementation was adapted and modified from this template server socket code from Jennifer Nicholas https://www.tutorialspoint.com/sending-and-receiving-data-with-sockets-in-android
 
@@ -61,7 +61,7 @@ The program NDNsim.py contains 10 parameters for the NDN simulator.
 | -ipt, --iperf_test	| False	| Toggle to determine whether the simulation will generate dummy data or generate data via iperf3. |
 | -l, --logging	| False	| Toggle to determine whether all logging information will be printed. |
 
-To run, you can simply use `python3 NDNsim.py` or use the cli.
+To run, you can simply use ```python3 NDNsim.py``` or optionally use the cli.
 
 ### Configuring bash script
 
@@ -70,7 +70,7 @@ The file NDNsim_bash.sh allows you to execute batch runs of NDNsim.py with your 
 For example, if you want to execute 5 runs of NDNsim.py with the same topology file and the varying timeouts as 5, 4, 3, 2, and 1, then you would change line 5 of NDNsim_bash.sh to be: 
 `TIMEOUT=("5" "4" "3" "2" "1")`
 
-You will additionally need to modify the other parameters to match the same number of runs that you plan on making. So for example, you would also need to modify line 2 to be: 
+You will additionally need to modify all other parameters to match the same number of runs that you plan on making. So for example, you would also need to modify line 2 to be: 
 `TOPFILE=("topology.txt" "topology.txt" "topology.txt" "topology.txt" "topology.txt")`
 
-To use the bash script, simply run `bash NDNsim_bash.sh` after modifying the file to your specifications.
+To use the bash script, simply run ```bash NDNsim_bash.sh``` after modifying the file to your specifications.
