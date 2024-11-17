@@ -2,12 +2,15 @@
 
 #-------------------------------------------
 # IMPORTS
+
 from threading import Lock, Thread
 import socket, pickle, time
 from copy import deepcopy
 import subprocess
 import argparse
 import os
+#-------------------------------------------
+
 #-------------------------------------------
 # GLOBALS
 
@@ -20,12 +23,13 @@ phone_port = 9095
 # Variables
 topfile = 'topology.txt'
 weightfile = 'weights.txt'
+metrics_outfile = 'metrics_out.csv'
 
 timeout = 5 #resend for packets if you dont receive in this amount of seconds
 # timeout scenario: data packet is dropped before delta/linger has expired, 
 # we want to resend so we might be able to get the data before delta/linger expires
 
-pktgen_num = 5
+pktgen_num = 5 #how many packets to generate
 phone_node_connect_order_counter = 0 # index for mobile consumer location
 phone_node_connect_order = [4, 7, 4] # connecting gateway after move
 velocity = [100, 100, 100] # velocity at each gw connection
@@ -33,9 +37,6 @@ delta = [.1, .1, 100] # data deadline in seconds until we move
 
 global_topology = [] #for dijkstras
 num_nodes = -1 #number of nodes in the topology
-time_left = 0 #remaining time
-distance_left = 0 #remaining distance
-
 client = "" # later assigned as subprocess
 
 # Toggles
@@ -57,9 +58,15 @@ total_packet_counter = 0 #number of total interests out
 total_packet_counter_lock = Lock() #lock to track the total number of return packets
 packet_drop = [] #number of packets dropped
 packet_drop_lock = Lock() #lock for number of packets dropped
+num_precache = 0 #number of times precaching occured
+num_precache_lock = Lock() #lock for number of times precaching occured
+num_cache_hit = 0 #number of cache hits that occured
+num_cache_hit_lock = Lock() #lock for number of cache hits that occured 
+#-------------------------------------------
 
 #-------------------------------------------
 # CLASS OBJECTS
+
 #-------------------------------------------------------------------------------
 # Hybrid name
 # contains some redundant fields (hierarchical and flat component)
@@ -72,16 +79,15 @@ class Hybrid_Name:
 		self.data_hash = data_hash #data hash (data packet only)
 		self.hierarchical_component = hierarchical_component
 		self.flat_component = flat_component #limit is 4 bytes for data name, 8 bytes for data
+		
 	#-------------------------------------------
-	# Prints Hybrid name in a formatted way.
+	# Prints Hybrid name in a formatted way
 	def print_info(self):
-		print_lock.acquire()
 		print("Task: " + self.task)
 		print("Device Name: " + self.device_name)
-		print("data_hash: " + self.data_hash)
+		print("Data_hash: " + str(self.data_hash))
 		print("Hierarchical Component: " + self.hierarchical_component)
 		print("Flat Component: " + self.flat_component)
-		print_lock.release()
 
 #-------------------------------------------------------------------------------
 # Pit entry
@@ -92,20 +98,18 @@ class PIT_Entry:
 		self.incoming_interface = incoming_interface #int - number of node we just came from
 		self.data_name = data_name #Hybrid_Name object
 		self.total = total #total number of instances of a packet we have seen
+	
 	#-------------------------------------------
-	# Prints pit entry info fomatted
+	# Prints Hybrid name in a formatted way
 	def print_info(self):
-		print_lock.acquire()
 		print("Incoming Interface: " + str(self.incoming_interface))
 		print("Hierarchical Name Info Start")
-		print_lock.release()
 		self.data_name.print_info()
-		print_lock.acquire()
 		print("Hierarchical Name Info End")
 		print("Total Counter: " + str(self.total))
-		print_lock.release()
 	
 #-------------------------------------------------------------------------------
+# Cache entry
 # Assumptions: infinite TTL, infinite cache size, no eviction policy
 # Assumptions: Only precaching, not caching
 # Assumptions: 1 cache entry is all the packets 
@@ -114,7 +118,10 @@ class PIT_Entry:
 class Cache_Entry:
 	def __init__(self, data_name, packet):
 		self.data_name = data_name #Hybrid_Name object
-		self.packets = [packet] #first data chunk for this cache entry
+		self.packets = packet #array of packets of data chunks for this data
+		
+	#-------------------------------------------
+	# Prints Hybrid name in a formatted way
 	def print_info(self):
 		print("Hybrid Name Info Start")
 		self.data_name.print_info()
@@ -122,6 +129,7 @@ class Cache_Entry:
 		for x in range(len(self.packets)):
 			print(self.packets[x].print_info())
 			print("")
+			
 #-------------------------------------------------------------------------------
 # Node
 # Represenetative of nodes (routers) in a topology
@@ -142,22 +150,19 @@ class Node:
 		self.PIT = PIT
 		self.cache = cache	
 		self.transmission_range = 10 #hardcode the range to 10 units
+		
 	#-------------------------------------------
-	# Prints Node info formatted
+	# Prints Hybrid name in a formatted way
 	def print_info(self):
-		print_lock.acquire()
 		print("IP:" + self.IP)
 		print("Port: " + str(self.port))
 		print("Number: " + str(self.number))
 		print("Hierarchical Name Info Start")
-		print_lock.release()
 		self.data_name.print_info()
-		print_lock.acquire()
 		print("Hierarchical Name Info End")
-		print("FIB: " + str(self.FIB))
 		print("Weights: " + str(self.weights))
+		print("FIB: " + str(self.FIB))
 		print("PIT: ")
-		print_lock.release()
 		for x in range(len(self.PIT)):
 			print(self.PIT[x].print_info())
 			print("")
@@ -166,6 +171,47 @@ class Node:
 			print(self.cache[x].print_info())
 			print("")
 		print("Transmission Range: " + str(self.transmission_range))
+		
+#-------------------------------------------------------------------------------
+# Packet
+# Interest or Data packet that stores the hybrid name
+# interest if data name has no data_hash, data if it does
+# total_packets: tells PIT how many packets to expect
+class Packet:
+	def __init__(self, name, time, total_packets, counter, linger_time, delta, velocity, total_size, payload, alpha, destination, precache):
+		self.name = name #Hybrid_Name object
+		
+		# interest packet only
+		self.linger_time = linger_time #lambda
+		self.delta = delta #delta
+		self.velocity = velocity #v
+		self.alpha = alpha # transmission rate of everything so far.
+		self.time = time #time we sent the packet
+		
+		# data packet only
+		self.total_packets = total_packets #signifies how many sub packets make up the total data
+		self.counter = counter #used to order the packets for reconstruction (for multiple data packets)
+		self.total_size = total_size #k, total size of all expecting data packets
+		self.payload = payload
+		self.destination = destination #-1 if NDN, else destination for precaching
+		self.precache = precache #True if packet was generated due to precaching
+		
+	#-------------------------------------------
+	# Prints Hybrid name in a formatted way
+	def print_info(self):
+		print("Hierarchical Name Info Start")
+		self.name.print_info()
+		print("Hierarchical Name Info End")
+		print("Total Packets : " + str(self.total_packets))
+		print("Counter: " + str(self.counter))
+		print("Linger Time: " + str(self.linger_time))
+		print("Delta: " + str(self.delta))
+		print("Velocity: " + str(self.velocity))
+		print("Total Size: " + str(self.total_size))
+		print("Payload: " + str(self.payload))
+		print("Alpha: " + str(self.alpha))
+		print("Destination: " + str(self.destination))
+		print("Precache: " + str(self.precache))
 		
 #-------------------------------------------------------------------------------
 # Topology 
@@ -177,10 +223,10 @@ class Topology:
 		self.nodes = []
 		self.weights = []
 		self.NDN_FIB = [] #for NDN forwarding
-		counter = 0
-		f = open(file, 'r')
 		
 		#Reads in the topology
+		f = open(file, 'r')
+		counter = 0
 		while True:
 			data = f.readline()
 			if not data:
@@ -215,9 +261,9 @@ class Topology:
 			self.nodes.append(temp_node)
 		f.close()
 		
+		#Reads in the weights
 		f = open(file_2, 'r')
 		counter = 0
-		#Reads in the weights
 		while True:
 			data = f.readline()
 			if not data:
@@ -246,266 +292,15 @@ class Topology:
 					print("Error! FIB entry provided in topology doesn't have matching weight!")
 					exit(1)
 
-#-------------------------------------------------------------------------------
-# Packet
-# Interest or Data packet that stores the hybrid name
-# interest if data name has no data_hash, data if it does
-# total_packets: tells PIT how many packets to expect
-class Packet:
-	def __init__(self, name, time, total_packets, counter, number, linger_time, delta, velocity, total_size, payload, alpha, destination):
-		self.name = name #Hybrid_Name object
-		
-		# interest packet only
-		self.linger_time = linger_time #lambda
-		self.delta = delta #delta
-		self.velocity = velocity #v
-		self.alpha = alpha # transmission rate of everything so far.
-		self.time = time #time we sent the packet
-		self.number = number #the number of the packet ID
-		
-		
-		# data packet only
-		self.total_packets = total_packets #signifies how many sub packets make up the total data
-		self.counter = counter #used to order the packets for reconstruction (for multiple data packets)
-		self.total_size = total_size #k, total size of all expecting data packets
-		self.payload = payload
-		self.destination = destination #-1 if NDN, else destination for precaching
-	#-------------------------------------------
-	# Prints packet info formatted
-	def print_info(self):
-		print("Hierarchical Name Info Start")
-		self.data_name.print_info()
-		print("Hierarchical Name Info End")
-		print("Total Packets : " + str(total_packets))
-		print("Counter: " + str(self.counter))
-		print("Number: " + str(self.number))
-		print("Linger Time: " + str(self.linger_time))
-		print("Delta: " + str(self.delta))
-		print("Velocity: " + str(self.velocity))
-		print("Payload: " + str(self.payload))
-		print("Alpha: " + str(self.alpha))
-		print("Mode: " + str(self.mode))
 #-------------------------------------------
 # FUNCTIONS
+
 #-------------------------------------------------------------------------------
-# Socket code
-# Given a node, open server sockets to listen for connections
-# When packet is received, close socket and Thread to process the packet
-# When 'close' is receieved, shutdown the socket and child threads
-def socket_code(node):
-		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # allows us to reuse socket for next run
-		s.bind((node.IP, node.port))
-		
-		if logging:
-			print("Node " + str(node.number) + " up on port: " + str(node.port))
-			
-		s.listen()
-		while True:
-			conn, addr = s.accept()
-			data = conn.recv(1024) # waits for data
-			packet = pickle.loads(data) # uses pickle format for sending/receiving
-			conn.close()
-			
-			if (packet.name.hierarchical_component != 'close' and packet.name.hierarchical_component != 'test') and logging:
-				print("Node " + str(node.number) + " received data from Node " + str(addr[1]-port))
-				print("", end="")
-				
-			# thread to process the packet (Cache, PIT, FIB stuff)
-			t1 = Thread(target=service_connection, args=[packet, node, addr[1]-port])
-			t1.start()
-			
-			# Closes child threads if we're done
-			if packet.name.hierarchical_component == 'close':
-				t1.join()
-				break
-		s.shutdown(socket.SHUT_RDWR)
-		s.close()
-#-------------------------------------------------------------------------------
-# Service connection
-# When a packet has been receivd at a node, we process it
-def service_connection(packet, node, previous_node):
-	global node_init
-	global node_init_lock
-	global final_data
-	global final_data_lock
-	global logging
-	
-	# -----
-	# If the packet is 'test' or 'close', don't do any NDN processes
-	if packet.name.hierarchical_component == 'test' or packet.name.hierarchical_component == 'close':
-		if packet.name.hierarchical_component == 'test':
-			print("", end="")
-		elif packet.name.hierarchical_component == 'close' and logging:
-			print("Shutting down node " + str(node.number))
-			
-		# If there are still nodes to be tested or closed, send it to the next node in line (indicated by port) 
-		if num_nodes != node.number + 1:
-			send_packet(ip, port+node.number, port+node.number+num_nodes+1, packet)
-		# if no more nodes need to be tested or closed, flip node_init flag 
-		else:
-			node_init_lock.acquire()
-			if packet.name.hierarchical_component == 'test':
-				node_init = 1
-			elif packet.name.hierarchical_component == 'close':
-				node_init = 0
-			node_init_lock.release()	
-	
-	# -----
-	# If the packet is not 'test' or 'close', begin NDN process
-	else:
-		cache_hit = -1
-		precache = False
-		next_node = [] # next node to send to, is list for sending multiple packets
-		new_packets = []
-		# -----
-		# If we are an interest packet, check for a cache hit
-		# Assumptions: 1 cache entry is all the packets, can check by seeing if the length of the entry is the value of total_size for the first entry
-		if packet.payload == "": 
-			node.cache_lock.acquire()
-			local_cache = node.cache
-			node.cache_lock.release()
-			for x in range(len(local_cache)):
-				# flat match = cache hit
-				if local_cache[x].data_name.flat_component == packet.name.flat_component: 
-					#if the cache entry has all of the data
-					if len(local_cache[x].packets) == local_cache[x].packets[0].total_packets: 
-						cache_hit = x
-						# if transmission rate is less than delta and linger time --> precache
-						# TODO: Shouldn't alpha be a list instead of a sum?
-						if not((local_cache[x].packets[0].total_size/packet.alpha) + (time.time()-packet.time) < packet.delta and 
-								(local_cache[x].packets[0].total_size/packet.alpha) + (time.time()-packet.time) < packet.linger_time):
-							precache = True
-						break
-		# -----
-		# If we are an interest packet AND .. a cache hit occured OR we are at the producer	
-		if packet.payload == "" and (cache_hit != -1 or packet.name.hierarchical_component == node.data_name.hierarchical_component): 
-			if cache_hit != -1:
-				if logging:
-					print("Cache hit")
-				node.cache_lock.acquire()
-				local_cache = node.cache[cache_hit]
-				node.cache_lock.release()
-				for x in range(len(local_cache)): # appending cached data packets
-					new_packets.append(local_cache.packets[x])
-					next_node.append(previous_node) #always send back (clear PITs)
-				if precache == True:
-					if logging:
-						print("Precaching")
-					new_destination = next_gateway(node, packet.velocity) 
-					temp_next = dijkstras(node.number, new_destination, global_topology)[2] #find the next hop
-					for x in range(len(new_packets)): #adding new packets and destination
-						temp_packet = deepcopy(new_packet[x])
-						temp_packet.destination = new_destination
-						new_packets.append(temp_packet)
-						next_node.append(temp_next)
-			
-			else: # Not a cache hit, append node's data as payload in packet and add data_hash to data_name
-				if logging:
-					print("Reached Producer")
-				new_packets, total_size = generate_packets(packet, node.data_name) # generates data packets to be sent
-				for x in range(len(new_packets)):
-					next_node.append(previous_node) #always send back 
-				# if sending to original won't meet delta/linger requirement --> precache
-				if not((total_size/packet.alpha) + (time.time()-packet.time) < packet.delta and (total_size/packet.alpha) + (time.time()-packet.time) < packet.linger_time):
-					if logging:
-						print("Precaching")
-					new_destination = next_gateway(node, packet.velocity)
-					temp_next = dijkstras(node.number, new_destination, global_topology)[2]
-					for x in range(len(new_packets)): #adding new packets and destination
-						temp_packet = deepcopy(new_packets[x])
-						temp_packet.destination = new_destination
-						new_packets.append(temp_packet)
-						next_node.append(temp_next)
-		
-		# -----
-		# If we are a data packet
-		elif packet.payload != "":
-			if packet.destination == -1: # NDN routing AKA reverse path
-				node.PIT_lock.acquire()	
-				pit_index = []
-				#Check all PIT entries to see where to go to
-				for x in range(len(node.PIT)):
-					# match PIT entry
-					if node.PIT[x].data_name.hierarchical_component == packet.name.hierarchical_component and node.PIT[x].data_name.device_name == packet.name.device_name:
-						# append PIT entry's incoming interface as next node to send to
-						next_node.append(node.PIT[x].incoming_interface)
-						temp_packet = deepcopy(packet)
-						new_packets.append(temp_packet) # add packet as packets to send
-						node.PIT[x].total = node.PIT[x].total + 1 # increment the number of data packets we've seen for this PIT entry
-						# if number of data packets we've seen matches the number of packets we expect
-						if node.PIT[x].total == packet.total_packets: 
-							pit_index.append(x) # keep track of PIT entry index to be removed
-				# Remove all PIT entries we are going to send to
-				# (There can be multiple because of interest collapsing) 
-				for x in range(len(pit_index)):
-					del node.PIT[(pit_index[-x-1])]
-				node.PIT_lock.release()	
-			else: # Precache forwarding
-				temp_next = dijkstras(node.number, packet.destination, global_topology)[2] #get next hop
-				if temp_next == packet.destination:
-					next_node.append(-1)
-				else:
-					next_node.append(temp_next)
-				new_packets.append(packet)
-			
-			# -----
-			#TODO - If we wanted to do normal caching (not precaching), do it here
-		
-		# -----
-		# We are an interest packet that needs to go to the next node		
-		else:
-			collapse = False
-			node.PIT_lock.acquire()	
-						
-			# Check PIT for interest collapsing
-			for x in range(len(node.PIT)):
-				# PIT entry match
-				if node.PIT[x].data_name.hierarchical_component == packet.name.hierarchical_component and node.PIT[x].data_name.device_name == packet.name.device_name:
-					print("Interest Collapsed!")
-					collapse = True
-					node.PIT.append(PIT_Entry(previous_node, packet.name, deepcopy(node.PIT[x].total))) #record in PIT
-					node.PIT_lock.release()
-					break 
-			
-			# If no collapsing, record in PIT
-			if collapse == False:
-				node.PIT.append(PIT_Entry(previous_node, packet.name, 0)) #record in PIT
-				node.PIT_lock.release()
-				# Using longest prefix matching, figure out where to go next
-				counter = []
-				packet_name = packet.name.hierarchical_component
-				for x in range(len(node.FIB)):
-					value = 0
-					for y in range(len(node.FIB[x])):
-						if node.FIB[x][y] == packet_name[y]:
-							value = value + 1
-						else:
-							break
-					counter.append(value) # append match length for xth FIB entry
-				next_node.append(counter.index(max(counter))) # append the index of the longest match
-				packet.alpha = packet.alpha + node.weights[counter.index(max(counter))]
-				new_packets.append(packet)
-		
-		# -----
-		#Send packet
-		for x in range(len(next_node)):
-		
-			# If back to Access Point (aka -1)
-			# update nth interest's final_data (sorted in main)
-			if next_node[x] == -1:
-				if packet.destination == -1: #only care about non precache
-					final_data_lock.acquire()					
-					final_data[new_packets[x].number].append(new_packets[x])
-					packet_drop_lock.acquire()
-					packet_drop[new_packets[x].number].append(time.time())
-					packet_drop_lock.release()
-					final_data_lock.release()
-			# Not done, send packets to next nodes.
-			else:
-				if logging:
-					print("Node " + str(node.number) + " is sending data to Node " + str(next_node[x]))
-				send_packet(ip, port+node.number, port+next_node[x]+num_nodes, new_packets[x])
+#Prints object info thread safe
+def print_info_helper(value):
+	print_lock.acquire()
+	value.print_info()
+	print_lock.release()
 
 #-------------------------------------------------------------------------------	
 # Send packet
@@ -525,11 +320,12 @@ def send_packet(ip, src_port, dest_port, packet):
 	data_to_send = pickle.dumps(packet) 
 	client.send(data_to_send) # send data as pickle
 	client.close() # disconnect
+	
 #-------------------------------------------------------------------------------
 # close threads
 # sends 'close' message to all nodes until all nodes and threads are closed
 def close_threads(thread_list):
-	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'close', ""), time.time(), 0, 0, -1, -1, -1, -1, -1, "", -1, -1))
+	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'close', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False))
 	for x in range(len(thread_list)):
 			thread_list[x].join()
 	print("All nodes offline")
@@ -538,7 +334,6 @@ def close_threads(thread_list):
 # generate packets
 # returns a list of data_names
 def generate_packets(packet, data_name):
-	#global iperf3_time
 	global pktgen_num
 	global client
 	new_packets = []
@@ -562,11 +357,6 @@ def generate_packets(packet, data_name):
 	
 	# if testing dummy data, new packets are just str of number
 	else:
-		'''
-		total_packet_counter_lock.acquire()
-		temp_packet_counter = total_packet_counter
-		total_packet_counter_lock.release()
-		'''
 		total_size = pktgen_num
 		for x in range(pktgen_num):
 			temp_packet = deepcopy(packet)
@@ -581,26 +371,30 @@ def generate_packets(packet, data_name):
 		new_packets[x].total_packets = len(new_packets)
 		new_packets[x].counter = x
 	return new_packets, total_size
+	
 #-------------------------------------------------------------------------------
 # Next Gateway
 # determines where we are going next
 # returns destination gateway ID
 # TODO: currently hardcoded
 def next_gateway(current_node, velocity):
+	global phone_node_connect_order_counter
 	ret_value = 0
 	try:
-		ret_value = phone_node_connect_order[phone_node_connect_order_counter]
 		phone_node_connect_order_counter += 1
+		ret_value = phone_node_connect_order[phone_node_connect_order_counter]
 		return ret_value
 	except:
 		return phone_node_connect_order[-1]
 	return ret_value	
+	
 #-------------------------------------------------------------------------------
 # Calculates the linger time 
 # TODO: currently hardcoded
 def calc_linger(transmission_range, velocity):
 	return velocity	
-#-------------------------------------------
+	
+#-------------------------------------------------------------------------------
 # dijkstras
 # Finds shortest path from x to y
 # returns the shortest path, its weight, and the next hop.
@@ -648,13 +442,11 @@ def dijkstras(x, y, topology):
 	
 	return ret_route, smallest_val, ret_route[1]
 	
-	
-#-------------------------------------------
-# argparse
 #-------------------------------------------------------------------------------
+# argparse
 def readargs():
 	global topfile, weightfile, pktgen_num, timeout, phone_node_connect_order
-	global velocity, delta, phone_test, iperf_test, logging
+	global velocity, delta, phone_test, iperf_test, logging, metrics_outfile
 
 	p = argparse.ArgumentParser(description = "Mobile Consumer NDN simulator")
 	 
@@ -697,6 +489,9 @@ def readargs():
 		data via iperf3. Default is False.")
 	p.add_argument("-l", "--logging", type = str, default = False,
 		help = "Toggle to determine whether all logging information will be printed. Default is False.")
+	 
+	p.add_argument("-o", "--outfile", type = str, default = 'metrics_out.csv',
+		help = "Output file for simulation metrics. Appended to if exists already, creates if not.")
 		
 	args = p.parse_args()
 	
@@ -704,12 +499,13 @@ def readargs():
 		print("Specified topfile", args.topfile ,"does not exist")
 		exit()
 	if not (os.path.isfile(args.weightfile)):
-		print("Specified topfile", args.weightfile ,"does not exist")
+		print("Specified weightfile", args.weightfile ,"does not exist")
 		exit()
 	if len(args.phone_node_connect_order.split(', ')) != len(args.velocity.split(', ')):
 		print("Length of phone_node_connect_order",args.phone_node_connect_order,"is different from length of velocity",args.velocity,"")
 		exit()
-	
+		
+	metrics_outfile = args.outfile
 	topfile = args.topfile
 	weightfile = args.weightfile
 	pktgen_num = args.pktgen_num
@@ -729,9 +525,271 @@ def readargs():
 		logging = True
 	else:
 		logging = False
+		
+	print("CLI: python3 NDNsim.py -tp", topfile, "-wp", weightfile, "-pgn", pktgen_num, "-to", timeout, "-pnco", phone_node_connect_order, "-v", velocity, "-d", delta, "-pt", phone_test, "-ipt", iperf_test, "-l", args.logging, "\n")
+
+#-------------------------------------------------------------------------------
+# Socket code
+# Given a node, open server sockets to listen for connections
+# When packet is received, close socket and Thread to process the packet
+# When 'close' is receieved, shutdown the socket and child threads
+def socket_code(node):
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # allows us to reuse socket for next run
+		s.bind((node.IP, node.port))
+		
+		if logging:
+			print("Node " + str(node.number) + " up on port: " + str(node.port))
+			
+		s.listen()
+		while True:
+			conn, addr = s.accept()
+			data = conn.recv(1024) # waits for data
+			packet = pickle.loads(data) # uses pickle format for sending/receiving
+			conn.close()
+			
+			if (packet.name.hierarchical_component != 'close' and packet.name.hierarchical_component != 'test') and logging:
+				print("Node " + str(node.number) + " received data from Node " + str(addr[1]-port))
+				
+			# thread to process the packet (Cache, PIT, FIB stuff)
+			t1 = Thread(target=service_connection, args=[packet, node, addr[1]-port])
+			t1.start()
+			
+			# Closes child threads if we're done
+			if packet.name.hierarchical_component == 'close':
+				t1.join()
+				break
+		s.shutdown(socket.SHUT_RDWR)
+		s.close()
+		
+#-------------------------------------------------------------------------------
+# Service connection
+# When a packet has been receivd at a node, we process it
+def service_connection(packet, node, previous_node):
+	global node_init, node_init_lock, final_data, final_data_lock, logging, num_cache_hit, num_precache
+	
+	# -----
+	# If the packet is 'test' or 'close', don't do any NDN processes
+	if packet.name.hierarchical_component == 'test' or packet.name.hierarchical_component == 'close':
+		if packet.name.hierarchical_component == 'close' and logging:
+			print("Shutting down node " + str(node.number))
+			
+		# If there are still nodes to be tested or closed, send it to the next node in line (indicated by port) 
+		if num_nodes != node.number + 1:
+			send_packet(ip, port+node.number, port+node.number+num_nodes+1, packet)
+		# if no more nodes need to be tested or closed, flip node_init flag 
+		else:
+			node_init_lock.acquire()
+			if packet.name.hierarchical_component == 'test':
+				node_init = 1
+			elif packet.name.hierarchical_component == 'close':
+				node_init = 0
+			node_init_lock.release()	
+	
+	# -----
+	# If the packet is not 'test' or 'close', begin NDN process
+	else:
+		cache_hit = -1
+		precache = False
+		next_node = [] # next node to send to, is list for sending multiple packets
+		new_packets = []
+		# -----
+		# If we are an interest packet, check for a cache hit
+		# Assumptions: 1 cache entry is all the packets, can check by seeing if the length of the entry is the value of total_size for the first entry
+		if packet.payload == "": 
+			node.cache_lock.acquire()
+			local_cache = node.cache
+			node.cache_lock.release()
+			for x in range(len(local_cache)):
+				# flat match = cache hit
+				if local_cache[x].data_name.device_name == packet.name.device_name: 
+					#if the cache entry has all of the data
+					if logging:
+						print("Cache entry match!")
+					if len(local_cache[x].packets) == local_cache[x].packets[0].total_packets: 
+						cache_hit = x		
+						# no precaching if delta timeout or were at the last connection
+						if not ((local_cache[x].packets[0].total_size/packet.alpha) + (time.time()-packet.time) < packet.linger_time) and phone_node_connect_order_counter != len(phone_node_connect_order)-1:
+							precache = True
+						break
+					if logging:
+						print("Cache entry is missing data")
+		# -----
+		# If we are an interest packet AND .. a cache hit occured OR we are at the producer	
+		if packet.payload == "" and (cache_hit != -1 or packet.name.hierarchical_component == node.data_name.hierarchical_component): 
+			if cache_hit != -1:
+				if logging:
+					print("Cache hit!")
+				num_cache_hit_lock.acquire()	
+				num_cache_hit = num_cache_hit + 1
+				num_cache_hit_lock.release()
+				node.cache_lock.acquire()
+				local_cache = node.cache[cache_hit]
+				for x in range(len(local_cache.packets)): # appending cached data packets
+					new_packets.append(local_cache.packets[x])
+					next_node.append(previous_node) #always send back (clear PITs)
+				node.cache_lock.release()
+				if precache == True:
+					if logging:
+						print("Precaching from cache!")
+					num_precache_lock.acquire()
+					num_precache = num_precache + 1
+					num_precache_lock.release()
+					new_destination = next_gateway(node, packet.velocity) 
+					temp_next = dijkstras(node.number, new_destination, global_topology)[2] #find the next hop
+					for x in range(len(new_packets)): #adding new packets and destination
+						temp_packet = deepcopy(new_packets[x])
+						temp_packet.destination = new_destination
+						temp_packet.precache = True
+						new_packets.append(temp_packet)
+						next_node.append(temp_next)
+			
+			else: # Not a cache hit, append node's data as payload in packet and add data_hash to data_name
+				if logging:
+					print("Reached Producer")
+				new_packets, total_size = generate_packets(packet, node.data_name) # generates data packets to be sent
+				for x in range(len(new_packets)):
+					next_node.append(previous_node) #always send back 
+				# if sending to original won't meet delta/linger requirement --> precache
+				if not ((total_size/packet.alpha) + (time.time()-packet.time) < packet.linger_time):
+					if phone_node_connect_order_counter != len(phone_node_connect_order)-1: #dont precache if last connection
+						new_destination = next_gateway(node, packet.velocity)
+						if logging:
+							print("Precaching from producer to node", new_destination, "!")
+						num_precache_lock.acquire()
+						num_precache = num_precache + 1
+						num_precache_lock.release()
+						temp_next = dijkstras(node.number, new_destination, global_topology)[2]
+						for x in range(len(new_packets)): #adding new packets and destination
+							temp_packet = deepcopy(new_packets[x])
+							temp_packet.destination = new_destination
+							temp_packet.precache = True
+							new_packets.append(temp_packet)
+							next_node.append(temp_next)
+		
+		# -----
+		# If we are a data packet
+		elif packet.payload != "":
+			if packet.destination == -1: # NDN routing AKA reverse path
+				node.PIT_lock.acquire()	
+				pit_index = []
+				#Check all PIT entries to see where to go to
+				for x in range(len(node.PIT)):
+					# match PIT entry
+					if node.PIT[x].data_name.hierarchical_component == packet.name.hierarchical_component and node.PIT[x].data_name.device_name == packet.name.device_name:
+						# append PIT entry's incoming interface as next node to send to
+						next_node.append(node.PIT[x].incoming_interface)
+						temp_packet = deepcopy(packet)
+						new_packets.append(temp_packet) # add packet as packets to send
+						node.PIT[x].total = node.PIT[x].total + 1 # increment the number of data packets we've seen for this PIT entry
+						# if number of data packets we've seen matches the number of packets we expect
+						if node.PIT[x].total == packet.total_packets: 
+							pit_index.append(x) # keep track of PIT entry index to be removed
+				# Remove all PIT entries we are going to send to
+				# (There can be multiple because of interest collapsing) 
+				for x in range(len(pit_index)):
+					del node.PIT[(pit_index[-x-1])]
+				node.PIT_lock.release()	
+			else: # Precache forwarding
+				temp_next = dijkstras(node.number, packet.destination, global_topology)[2] #get next hop
+				if temp_next == packet.destination and node.number == temp_next:
+					next_node.append(-1)
+				else:
+					next_node.append(temp_next)
+				new_packets.append(packet)
+			
+			# -----
+			#TODO - If we wanted to do normal caching (not precaching), do it here
+		
+		# -----
+		# We are an interest packet that needs to go to the next node		
+		else:
+			collapse = False
+			node.PIT_lock.acquire()	
+						
+			# Check PIT for interest collapsing
+			for x in range(len(node.PIT)):
+				# PIT entry match
+				if node.PIT[x].data_name.hierarchical_component == packet.name.hierarchical_component and node.PIT[x].data_name.device_name == packet.name.device_name:
+					print("Interest Collapsed!")
+					collapse = True
+					node.PIT.append(PIT_Entry(previous_node, packet.name, deepcopy(node.PIT[x].total))) #record in PIT
+					node.PIT_lock.release()
+					break 
+			
+			# If no collapsing, record in PIT
+			if collapse == False:
+				node.PIT.append(PIT_Entry(previous_node, packet.name, 0)) #record in PIT
+				node.PIT_lock.release()
+				# Using longest prefix matching, figure out where to go next
+				counter = []
+				packet_name = packet.name.hierarchical_component
+				for x in range(len(node.FIB)):
+					value = 0
+					for y in range(len(node.FIB[x])):
+						if node.FIB[x][y] == packet_name[y]:
+							value = value + 1
+						else:
+							break
+					counter.append(value) # append match length for xth FIB entry
+				next_node.append(counter.index(max(counter))) # append the index of the longest match
+				packet.alpha = packet.alpha + node.weights[counter.index(max(counter))]
+				new_packets.append(packet)
+		
+		# -----
+		#Send packet
+		for x in range(len(next_node)):
+			# If back to Access Point (aka -1)
+			# update nth interest's final_data (sorted in main)
+			if next_node[x] == -1:
+				if packet.destination == -1: #if we are not precaching, return data
+					final_data_lock.acquire()					
+					final_data[-1].append(new_packets[x])
+					packet_drop_lock.acquire()
+					packet_drop[-1].append(time.time())
+					packet_drop_lock.release()
+					final_data_lock.release()
+					
+				else: #if precaching, cache the data
+					node.cache_lock.acquire()
+					local_cache = node.cache
+					node.cache_lock.release()
+					existing_entry = False
+					# find pre-exisitng cache entry of same data, if exists
+					
+					if len(local_cache) > 0:
+						for x in range(len(node.cache)):
+							# flat match = cache hit
+							if local_cache[x].data_name.device_name == new_packets[0].name.device_name: 
+								existing_entry = True
+								no_chunk = True
+								for i in range(len(new_packets)):
+									for j in range(len(local_cache[x].packets)):
+										# replace old packets if we have it,
+										if new_packets[i].counter == local_cache[x].packets[j].counter:
+											no_chunk = False
+											local_cache[x].packets[j] = new_packets[i]
+									# add new packets if its missing
+									if no_chunk:
+										local_cache[x].packets.append(new_packets[i])
+								break
+					
+					if not existing_entry:
+						# if cache entry doesn't exist, create it
+						new_cache = Cache_Entry(new_packets[0].name, new_packets)
+						node.cache_lock.acquire()
+						node.cache.append(new_cache)
+						node.cache_lock.release()
+					
+			# Not done, send packets to next nodes.
+			else:
+				if logging:
+					print("Node " + str(node.number) + " is sending data to Node " + str(next_node[x]))
+				send_packet(ip, port+node.number, port+next_node[x]+num_nodes, new_packets[x])
+
+
 #-------------------------------------------
 # MAIN
-#-------------------------------------------------------------------------------
 if __name__ == "__main__":
 
 	readargs()
@@ -760,7 +818,7 @@ if __name__ == "__main__":
 	
 	# -----
 	# Tests nodes 
-	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'test', ""), time.time(), 0, 0, -1, -1, -1, -1, -1, "", -1, -1))
+	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'test', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False))
 	
 	# waits until all nodes are online
 	while node_init != 1:
@@ -772,20 +830,11 @@ if __name__ == "__main__":
 	# Connect to server on phone
 	if phone_test:
 		try:
-			
-
 			phone_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			phone_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			phone_client.settimeout(120) # arbitrary timeout
 			phone_client.connect((phone_ip, phone_port))
 
-			'''
-			phone_client = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-			#phone_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-			#phone_client.settimeout(60) # arbitrary timeout
-			#phone_client.connect(('fe80::876:ce23:ba1e:c458', port, 0, 0))
-			phone_client.connect(('::1', port, 0, 0))
-			'''
 			# receive interest from phone
 			phone_data = phone_client.recv(1024).decode('utf-8')
 		except Exception as e:
@@ -793,6 +842,7 @@ if __name__ == "__main__":
 			print(e)
 			close_threads(thread_list)
 			exit()
+			
 	# If not connecting to phone, use this as interest
 	else:
 		phone_data = 'VA/Fairfax/GMU/CS/actionOn:1R153AN'
@@ -815,13 +865,18 @@ if __name__ == "__main__":
 
 	#global phone_node_connect_order
 	counter_x = 0
+	counter_delta = 0
 	timeout_counter = 0 
+	linger_timeout_counter = 0
+	delta_timeout_counter = 0
+	internal_timeout_counter = 0
 	temp_linger_time = 0 # linger time after timeout
 	temp_linger_flag = False # determines when to use temp_linger_time
 	rec_data = False
 	
 	# Sends interest packets until data is received or timeout occurs.
 	while True:
+		#time.sleep(5) #sleep to check for cache hit
 		phone_node_lock.acquire()
 		try:
 			phone_node = phone_node_connect_order[counter_x]
@@ -857,12 +912,12 @@ if __name__ == "__main__":
 			linger_time = temp_linger_time
 			temp_linger_flag = False
 		curr_time = time.time()
-		end_time = curr_time + delta[counter_x]
+		end_time = curr_time + delta[counter_delta]
 		end_time_1 = curr_time + timeout 
 		end_time_2 = curr_time + linger_time 
 		
 		# Sends interest packet from dummy node (-1) to access point (phone node)
-		send_packet(ip, port-1, port+phone_node+num_nodes, Packet(h_name, curr_time, 0, 0, temp_packet_counter, linger_time, delta[counter_x], velocity[counter_x], -1, "", 0, -1))	
+		send_packet(ip, port-1, port+phone_node+num_nodes, Packet(h_name, curr_time, 0, 0, linger_time, delta[counter_delta], velocity[counter_x], -1, "", 0.0001, -1, False))	
 		
 		# loop until we reach delta, linger, or timeout (end time)
 		while ((curr_time <= end_time) and (curr_time <= end_time_1) and (curr_time <= end_time_2)):
@@ -886,13 +941,14 @@ if __name__ == "__main__":
 		# break when last element of listed delta/linger is reached. 
 		
 		if curr_time >= end_time:
-			print("Delta time exceeded! Interest has failed!")
-			timestamp.append("Delta Timeout: " + str(delta[counter_x]))
-			counter_x = counter_x + 0 #if the timeout was from delta, DONT go to next gateway
+			print("Delta time exceeded!")
+			timestamp.append("Delta Timeout: " + str(delta[counter_delta]))
+			counter_delta = counter_delta + 1 #if the timeout was from delta, DONT go to next gateway, just move to next delta
 			timeout_counter = timeout_counter + 1
+			delta_timeout_counter = delta_timeout_counter + 1
 			timeout_time.append(end_time)
-			if counter_x >= len(delta):
-				print("Last delta exceeded! No packets received!")
+			if counter_delta >= len(delta):
+				print("Last delta exceeded! Interest has failed!")
 				break
 				
 		elif curr_time >= end_time_2:
@@ -900,20 +956,24 @@ if __name__ == "__main__":
 			timestamp.append("Linger Time Timeout: " + str(linger_time))
 			counter_x = counter_x + 1
 			timeout_counter = timeout_counter + 1
+			linger_timeout_counter = linger_timeout_counter + 1
 			timeout_time.append(end_time_2)
-			if counter_x >= len(delta):
-				print("Last linger time exceeded! No packets received!")
+			if counter_x >= len(velocity):
+				print("Last linger time exceeded! Interest has failed!")
 				break
+			else:
+				print("MC is moving to node", phone_node_connect_order[counter_x])
 				
 		elif curr_time >= end_time_1: # when to update the linger/delta
 			counter_x = counter_x + 0 # don't progress; resend instead
-			delta[counter_x] = delta[counter_x] - timeout #update delta and linger wrt how much time has passed already
+			delta[counter_delta] = delta[counter_delta] - timeout #update delta and linger wrt how much time has passed already
 			temp_linger_time = linger_time - timeout
 			temp_linger_flag = True
 			timeout_counter = timeout_counter + 1
+			internal_timeout_counter = internal_timeout_counter + 1
 			timeout_time.append(end_time_1)
 			timestamp.append("Internal Timeout: " + str(timeout))
-			print("Internal timeout detected! Resending packet!")
+			print("Internal timeout detected! Resending packet!", end=" ")
 				
 		# if we received data within timeout, break	
 		if timeout_check:
@@ -941,7 +1001,7 @@ if __name__ == "__main__":
 		print("Data hash:", sorted_final_data[0].name.data_hash)
 		print("Final Data: \n", end = "") 
 		for x in range(len(sorted_final_data)):
-			print(sorted_final_data[x].payload, end='')
+			print(sorted_final_data[x].payload, end='') 
 			# -----
 			# Send the data packet to the phone
 			if phone_test:
@@ -952,6 +1012,13 @@ if __name__ == "__main__":
 					phone_client.send((sorted_final_data[x].payload).encode('utf-8'))
 				time.sleep(3)
 		print("")
+		
+		precache_check = True
+		for x in range(len(sorted_final_data)):
+			if sorted_final_data[x].precache == False:
+				precache_check = False
+				break
+	
 	# close phone socket
 	if phone_test: 
 		phone_client.close()	
@@ -959,15 +1026,19 @@ if __name__ == "__main__":
 	# -----
 	# Assert all PITs are empty
 	# while waiting for everything to be done 
+	pit_time = time.time()
 	while True:
 		empty = True
 		for x in range(len(topology.nodes)):
 			if len(topology.nodes[x].PIT) != 0:
-				print("Warning: PIT for node " + str(x) + " is not empty!")
-				for y in range(len(topology.nodes[x].PIT)):
-					topology.nodes[x].PIT[y].print_info()
-					print("")
-				print("\n\n")
+				if pit_time+5 < time.time(): #only print the warning every 5sec, so you know you arent hanging
+					pit_time = time.time()
+					print("Warning: PIT for node " + str(x) + " is not empty!")
+					if (logging):
+						for y in range(len(topology.nodes[x].PIT)):
+							print_info_helper(topology.nodes[x].PIT[y])
+							print("")
+						print("\n\n")
 				empty = False
 		if empty == True:
 			break
@@ -977,7 +1048,7 @@ if __name__ == "__main__":
 	
 	# -----
 	#Metrics
-	print("")
+	print("\n--- METRICS ---")
 	total_delay = 0
 	
 	# prints delay of each interest packet
@@ -1009,8 +1080,31 @@ if __name__ == "__main__":
 	if len(timeout_time) != len(final_data):
 		print("Interest " + str(counter) + " had 0/" + str(len(final_data[counter])) + " packets drop")
 	print("Percentage of dropped packets: " + str(dropped_counter/total_data_counter*100) + "%")
-	print("")
-	exit()
+	print("--- END ---\n")
+	
+	f = ""
+	if os.path.isfile(metrics_outfile): #if the file exists already, append
+		f = open(metrics_outfile, 'a')
+	else: #if the file doesnt exist, create a new one and add the header
+		f = open(metrics_outfile, 'w')
+		f.write("Topfile, Weightfile, Pktgen_num, Timeout, Phone_node_connect_order, Velocity, Delta, Phone_test, iperf_test, End-To-End Delay, Total Number of Timeouts, Number of Linger Time Timeouts, Number of Delta Timeouts, Number of Internal Timeouts, Percent of dropped packets, Success?, Cache Hit?, Number of Cache Hits, Number of Times Precached\n")
+	temp_phone_node_connect_order = ""
+	temp_velocity = ""
+	for x in range(len(phone_node_connect_order)):
+		temp_phone_node_connect_order = temp_phone_node_connect_order + str(phone_node_connect_order[x])
+		temp_velocity = temp_velocity + str(velocity[x])
+		if x != len(phone_node_connect_order)-1:
+			temp_phone_node_connect_order = temp_phone_node_connect_order + " "
+			temp_velocity = temp_velocity + " "
+	temp_delta = ""
+	for x in range(len(delta)):
+		temp_delta = temp_delta + str(delta[x])
+		if x != len(delta)-1:
+			temp_delta = temp_delta + " "
+	f.write(topfile + ", " + weightfile + ", " + str(pktgen_num) + ", " + str(timeout) + ", " + str(temp_phone_node_connect_order) + ", " + str(temp_velocity) + ", " + str(temp_delta) + ", " +  str(phone_test) + ", " + str(iperf_test) + ", " + str(total_delay) + ", " + str(timeout_counter) + ", " + str(linger_timeout_counter) + ", " + str(delta_timeout_counter) + ", " + str(internal_timeout_counter) + ", " + str(dropped_counter/total_data_counter*100) + ", " + str(rec_data) + ", " + str(precache_check) + ", " + str(num_cache_hit) + ", " + str(num_precache) + "\n") 
+	
+	f.close()
+	os._exit(0)
 	
 			
 	
