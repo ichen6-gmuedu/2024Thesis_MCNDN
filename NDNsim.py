@@ -9,6 +9,7 @@ from copy import deepcopy
 import subprocess
 import argparse
 import os
+import numpy as np
 #-------------------------------------------
 
 #-------------------------------------------
@@ -22,8 +23,8 @@ phone_port = 9095
 
 # Variables
 topfile = 'topology.txt'
-weightfile = 'weights.txt'
-metrics_outfile = 'metrics_out.csv'
+weightdist = 'uniform:0, 1'
+metrics_outfile = 'metric_outfile.csv'
 
 timeout = 5 #resend for packets if you dont receive in this amount of seconds
 # timeout scenario: data packet is dropped before delta/linger has expired, 
@@ -31,9 +32,13 @@ timeout = 5 #resend for packets if you dont receive in this amount of seconds
 
 pktgen_num = 5 #how many packets to generate
 phone_node_connect_order_counter = 0 # index for mobile consumer location
-phone_node_connect_order = [4, 7, 4] # connecting gateway after move
-velocity = [100, 100, 100] # velocity at each gw connection
-delta = [.1, .1, 100] # data deadline in seconds until we move
+phone_node_connect_order = "uniform:0, 8" # connecting gateway after move
+velocity = "3:uniform:0, 0.5" # velocity at each gw connection (DUMMY)
+delta = "3:uniform:0, 0.5" # data deadline in seconds until we move
+linger_dist = "uniform:0, 8" #distribution probability for linger time (DUMMY)
+linger = [] # keeping track of "calculated" linger times for logging
+trans_range_dist = "uniform:0, 8" #distribution probability for node range (DUMMY)
+
 
 global_topology = [] #for dijkstras
 num_nodes = -1 #number of nodes in the topology
@@ -178,14 +183,14 @@ class Node:
 # interest if data name has no data_hash, data if it does
 # total_packets: tells PIT how many packets to expect
 class Packet:
-	def __init__(self, name, time, total_packets, counter, linger_time, delta, velocity, total_size, payload, alpha, destination, precache):
+	def __init__(self, name, time, total_packets, counter, alpha, delta, velocity, total_size, payload, lambda_, destination, precache, number):
 		self.name = name #Hybrid_Name object
 		
 		# interest packet only
-		self.linger_time = linger_time #lambda
+		self.alpha = alpha #linger time
 		self.delta = delta #delta
 		self.velocity = velocity #v
-		self.alpha = alpha # transmission rate of everything so far.
+		self.lambda_ = lambda_ # transmission rate of everything so far.
 		self.time = time #time we sent the packet
 		
 		# data packet only
@@ -195,6 +200,7 @@ class Packet:
 		self.payload = payload
 		self.destination = destination #-1 if NDN, else destination for precaching
 		self.precache = precache #True if packet was generated due to precaching
+		self.number = number #bunches packets together for grouping
 		
 	#-------------------------------------------
 	# Prints Hybrid name in a formatted way
@@ -204,12 +210,12 @@ class Packet:
 		print("Hierarchical Name Info End")
 		print("Total Packets : " + str(self.total_packets))
 		print("Counter: " + str(self.counter))
-		print("Linger Time: " + str(self.linger_time))
+		print("Linger Time: " + str(self.alpha))
 		print("Delta: " + str(self.delta))
 		print("Velocity: " + str(self.velocity))
 		print("Total Size: " + str(self.total_size))
 		print("Payload: " + str(self.payload))
-		print("Alpha: " + str(self.alpha))
+		print("lambda_: " + str(self.lambda_))
 		print("Destination: " + str(self.destination))
 		print("Precache: " + str(self.precache))
 		
@@ -219,14 +225,22 @@ class Packet:
 # The topology is N x N where N is the number of nodes
 # Initiates and stores each node in topology in self.nodes
 class Topology:
-	def __init__(self, file, file_2): #pass in a file, set up nodes
+	def __init__(self, file): #pass in a file, set up nodes
+		global weightdist, logging, trans_range_dist
 		self.nodes = []
 		self.weights = []
 		self.NDN_FIB = [] #for NDN forwarding
 		
+		wdist_str = weightdist[0]
+		wdist_param = list(map(float, weightdist[1].split(", ")))
+		
+		tr_dist_str = trans_range_dist[0]
+		tr_dist_param = list(map(float, trans_range_dist[1].split(", ")))
+		
 		#Reads in the topology
 		f = open(file, 'r')
 		counter = 0
+		i = 0
 		while True:
 			data = f.readline()
 			if not data:
@@ -234,9 +248,17 @@ class Topology:
 			line = data.split('\t')
 			FIB = line[1:]
 			temp_FIB = deepcopy(FIB)
+			temp_weights = []
 			for x in range(len(temp_FIB)):
 				if temp_FIB[x].rstrip() == "0":
 					temp_FIB[x] = 0
+					temp_weights.append(-1)
+				else:
+					temp_weights.append(distribution_helper(wdist_str, wdist_param))
+				if (x == i):
+					temp_weights[x] = 0
+				
+			self.weights.append(temp_weights)
 			self.NDN_FIB.append(temp_FIB)
 			
 			
@@ -259,9 +281,19 @@ class Topology:
 			# keeps track of what port to connect to next 
 			counter = counter + 1
 			self.nodes.append(temp_node)
+			self.nodes[i].weights = temp_weights
+			
+			# generate tranmission range probability distribution 
+			self.nodes[i].transmission_range = (distribution_helper(tr_dist_str, tr_dist_param))
+			
+			i = i+1
 		f.close()
 		
+		
+		
+		
 		#Reads in the weights
+		"""
 		f = open(file_2, 'r')
 		counter = 0
 		while True:
@@ -275,6 +307,7 @@ class Topology:
 			self.nodes[counter].weights = line
 			counter = counter + 1
 		f.close()
+		"""
 		
 		#assertions : make sure the weights and FIB have matching topologies
 		if len(self.nodes) != len(self.weights) and len(self.nodes) != len(self.NDN_FIB):
@@ -291,6 +324,17 @@ class Topology:
 				if ((self.weights[x][y] == -1 and self.NDN_FIB[x][y] != 0) or (self.weights[x][y] != -1 and self.NDN_FIB[x][y] == 0)) and x != y:
 					print("Error! FIB entry provided in topology doesn't have matching weight!")
 					exit(1)
+		if(not logging):
+			print("---")
+			print("weights")
+			for i in range(len(self.NDN_FIB)):
+				#for j in range(len(self.NDN_FIB[i])):
+				#	print(self.NDN_FIB[i][j], end="\t")
+				#print()
+				for j in range(len(self.NDN_FIB[i])):
+					print(round(self.weights[i][j], 2), end="\t")
+				print()
+					
 
 #-------------------------------------------
 # FUNCTIONS
@@ -301,7 +345,20 @@ def print_info_helper(value):
 	print_lock.acquire()
 	value.print_info()
 	print_lock.release()
-
+	
+#-------------------------------------------------------------------------------
+#Distribution helper
+def distribution_helper(distribution, values):
+	if distribution == "uniform":
+		# expected values are lower bounds and upper bounds
+		return abs(np.random.uniform(low=values[0], high=values[1]))
+	if distribution == "gaussian" or distribution == "normal":
+		# expected values are mean and std
+		return abs(np.random.normal(loc=values[0], scale=values[1]))
+	if distribution == "zipf":
+		# expected value is distribution parameter
+		return abs(np.random.zipf(a=values[0]))
+	
 #-------------------------------------------------------------------------------	
 # Send packet
 # Given source and dest port, connect, send packet, and disconnect  
@@ -325,7 +382,7 @@ def send_packet(ip, src_port, dest_port, packet):
 # close threads
 # sends 'close' message to all nodes until all nodes and threads are closed
 def close_threads(thread_list):
-	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'close', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False))
+	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'close', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False, -1))
 	for x in range(len(thread_list)):
 			thread_list[x].join()
 	print("All nodes offline")
@@ -392,7 +449,11 @@ def next_gateway(current_node, velocity):
 # Calculates the linger time 
 # TODO: currently hardcoded
 def calc_linger(transmission_range, velocity):
-	return velocity	
+	global linger_dist, linger
+	pdist = linger_dist[0]
+	pdist_params = list(map(float, linger_dist[1].split(", ")))
+	linger.append(distribution_helper(pdist, pdist_params))
+	return linger[len(linger)-1]
 	
 #-------------------------------------------------------------------------------
 # dijkstras
@@ -441,93 +502,6 @@ def dijkstras(x, y, topology):
 			ret_route = viable_routes[a]
 	
 	return ret_route, smallest_val, ret_route[1]
-	
-#-------------------------------------------------------------------------------
-# argparse
-def readargs():
-	global topfile, weightfile, pktgen_num, timeout, phone_node_connect_order
-	global velocity, delta, phone_test, iperf_test, logging, metrics_outfile
-
-	p = argparse.ArgumentParser(description = "Mobile Consumer NDN simulator")
-	 
-	p.add_argument("-tp", "--topfile", type = str, default = 'topology.txt',
-		help = "The file to read in the topology of the NDN system. Should be the same shape as weightfile")
-	p.add_argument("-wp", "--weightfile", type = str, default = 'weights.txt',
-		help = "The file to read in the weights of the NDN topology. Should be the same shape as topfile")
-		
-	p.add_argument("-pgn", "--pktgen_num", type = int, default = 5,
-		help = "When generating dummy data, determines how many data packets to generate.\n\
-		Default is 5 packets.")
-		
-	p.add_argument("-to", "--timeout", type = float, default = 5,
-		help = "Deadline to resend for packets if you dont receive in timeout amount of seconds\n \
-		timeout scenario: data packet is dropped before delta/linger has expired,\n \
-		we want to resend so we might be able to get the data before delta/linger expires.\n\
-		Default is 5 seconds.\
-		")
-		
-	p.add_argument("-pnco", "--phone_node_connect_order", type = str, default = "4, 7, 4",
-		help = "The Pattern in which the mobile consumer will disconnect and re-connect to nodes in the topology.\n \
-		Eg, the default: 4, 7, 4 means the MC will connect to node 4, then disconnect from node 4 and connect to node 7, then disconnect from node 7 and connect to node 4. It will stay there until the simulation ends. Must be the same length as velocity")
-		
-	p.add_argument("-v", "--velocity", type = str, default = "100, 100, 100",
-		help = "The MC's velocity at each gateway connection.\n\
-		Eg, the default: .1, .1, .1 means that at each node the mobile consumer is connecting to,\
-		they are travelling at a speed of 0.1 . Must be the same length as phone_node_connect_order")
-		
-	p.add_argument("-d", "--delta", type = str, default = ".1, .1, 100",
-		help = "The deadline in seconds before the data expires and we are no longer interested.\n\
-		Eg, the default: .1, .1, 100 means that the data packet must be received by the MC before \
-		.1 seconds before the MC moves and the interest is re-sent, this happens again at the re-\
-		connection, and finally sits for 100 seconds until the data is received.")
-		
-	p.add_argument("-pt", "--phone_test", type = str, default = False,
-		help = "Toggle to determine whether the simulation will connect to the Android Phone \
-		to receive the initial interest packet and send final data. Default is False.")
-	p.add_argument("-ipt", "--iperf_test", type = str, default = False,
-		help = "Toggle to determine whether the simulation will generate dummy data or generate \
-		data via iperf3. Default is False.")
-	p.add_argument("-l", "--logging", type = str, default = False,
-		help = "Toggle to determine whether all logging information will be printed. Default is False.")
-	 
-	p.add_argument("-o", "--outfile", type = str, default = 'metrics_out.csv',
-		help = "Output file for simulation metrics. Appended to if exists already, creates if not.")
-		
-	args = p.parse_args()
-	
-	if not (os.path.isfile(args.topfile)):
-		print("Specified topfile", args.topfile ,"does not exist")
-		exit()
-	if not (os.path.isfile(args.weightfile)):
-		print("Specified weightfile", args.weightfile ,"does not exist")
-		exit()
-	if len(args.phone_node_connect_order.split(', ')) != len(args.velocity.split(', ')):
-		print("Length of phone_node_connect_order",args.phone_node_connect_order,"is different from length of velocity",args.velocity,"")
-		exit()
-		
-	metrics_outfile = args.outfile
-	topfile = args.topfile
-	weightfile = args.weightfile
-	pktgen_num = args.pktgen_num
-	timeout = args.timeout
-	phone_node_connect_order = list(map(int, args.phone_node_connect_order.split(', ')))
-	velocity = list(map(float, args.velocity.split(', ')))
-	delta = list(map(float, args.delta.split(', ')))
-	if (args.phone_test in ["True", "true", "t", "T", "1", "on"]):
-		phone_test = True
-	else:
-		phone_test = False	
-	if (args.iperf_test in ["True", "true", "t", "T", "1", "on"]):
-		iperf_test = True
-	else:
-		iperf_test = False
-	if (args.logging in ["True", "true", "t", "T", "1", "on"]):
-		logging = True
-	else:
-		logging = False
-		
-	print("CLI: python3 NDNsim.py -tp", topfile, "-wp", weightfile, "-pgn", pktgen_num, "-to", timeout, "-pnco", phone_node_connect_order, "-v", velocity, "-d", delta, "-pt", phone_test, "-ipt", iperf_test, "-l", args.logging, "\n")
-
 #-------------------------------------------------------------------------------
 # Socket code
 # Given a node, open server sockets to listen for connections
@@ -609,7 +583,7 @@ def service_connection(packet, node, previous_node):
 					if len(local_cache[x].packets) == local_cache[x].packets[0].total_packets: 
 						cache_hit = x		
 						# no precaching if delta timeout or were at the last connection
-						if not ((local_cache[x].packets[0].total_size/packet.alpha) + (time.time()-packet.time) < packet.linger_time) and phone_node_connect_order_counter != len(phone_node_connect_order)-1:
+						if not ((local_cache[x].packets[0].total_size/packet.lambda_) + (time.time()-packet.time) < packet.alpha) and phone_node_connect_order_counter != len(phone_node_connect_order)-1:
 							precache = True
 						break
 					if logging:
@@ -625,9 +599,13 @@ def service_connection(packet, node, previous_node):
 				num_cache_hit_lock.release()
 				node.cache_lock.acquire()
 				local_cache = node.cache[cache_hit]
+				final_data_lock.acquire()
 				for x in range(len(local_cache.packets)): # appending cached data packets
-					new_packets.append(local_cache.packets[x])
+					temp_packet = deepcopy(local_cache.packets[x])
+					temp_packet.number = len(final_data)-1
+					new_packets.append(temp_packet)
 					next_node.append(previous_node) #always send back (clear PITs)
+				final_data_lock.release()
 				node.cache_lock.release()
 				if precache == True:
 					if logging:
@@ -651,7 +629,7 @@ def service_connection(packet, node, previous_node):
 				for x in range(len(new_packets)):
 					next_node.append(previous_node) #always send back 
 				# if sending to original won't meet delta/linger requirement --> precache
-				if not ((total_size/packet.alpha) + (time.time()-packet.time) < packet.linger_time):
+				if not ((total_size/packet.lambda_) + (time.time()-packet.time) < packet.alpha):
 					if phone_node_connect_order_counter != len(phone_node_connect_order)-1: #dont precache if last connection
 						new_destination = next_gateway(node, packet.velocity)
 						if logging:
@@ -733,7 +711,7 @@ def service_connection(packet, node, previous_node):
 							break
 					counter.append(value) # append match length for xth FIB entry
 				next_node.append(counter.index(max(counter))) # append the index of the longest match
-				packet.alpha = packet.alpha + node.weights[counter.index(max(counter))]
+				packet.lambda_ = packet.lambda_ + node.weights[counter.index(max(counter))]
 				new_packets.append(packet)
 		
 		# -----
@@ -744,9 +722,9 @@ def service_connection(packet, node, previous_node):
 			if next_node[x] == -1:
 				if packet.destination == -1: #if we are not precaching, return data
 					final_data_lock.acquire()					
-					final_data[-1].append(new_packets[x])
+					final_data[new_packets[x].number].append(new_packets[x])
 					packet_drop_lock.acquire()
-					packet_drop[-1].append(time.time())
+					packet_drop[new_packets[x].number].append(time.time())
 					packet_drop_lock.release()
 					final_data_lock.release()
 					
@@ -788,11 +766,172 @@ def service_connection(packet, node, previous_node):
 				send_packet(ip, port+node.number, port+next_node[x]+num_nodes, new_packets[x])
 
 
-#-------------------------------------------
+#-------------------------------------------------------------------------------
+# argparse
+def readargs():
+	global topfile, weightdist, pktgen_num, timeout, phone_node_connect_order, trans_range_dist
+	global velocity, delta, phone_test, iperf_test, logging, metrics_outfile, linger_dist
+
+	p = argparse.ArgumentParser(description = "Mobile Consumer NDN simulator")
+	 
+	p.add_argument("-tp", "--topfile", type = str, default = 'topology.txt',
+		help = "The file to read in the topology of the NDN system.")
+	p.add_argument("-w", "--weights", type = str, default = 'uniform:0, 1',
+		help = "distribution:distrubution values\n\
+		The lambda_ values (aka transmission rates) for each link in the topology \n\
+		chosen from the given probability distribution.\n\
+		The default, \"uniform:0, 1\" means that each link has a transmission rate \n\
+		chosen by the uniform probability distrobution between 0-1")
+		
+	#p.add_argument("-wp", "--weightfile", type = str, default = 'weights.txt',
+	#	help = "The file to read in the weights of the NDN topology. Should be the same shape as topfile")
+		
+	p.add_argument("-pgn", "--pktgen_num", type = int, default = 5,
+		help = "When generating dummy data, determines how many data packets to generate.\n\
+		Default is 5 packets.")
+		
+	p.add_argument("-to", "--timeout", type = float, default = 5,
+		help = "Deadline to resend for packets if you dont receive in timeout amount of seconds\n \
+		timeout scenario: data packet is dropped before delta/linger has expired,\n \
+		we want to resend so we might be able to get the data before delta/linger expires.\n\
+		Default is 5 seconds.\
+		")
+		
+		
+	p.add_argument("-l", "--linger", type = str, default = "uniform:0, 0.5",
+		help = "\"distribution:distrubution values\"\n\
+		The probability distribution for MC's linger time at each gateway connection.\n\
+		Eg, the default: \"uniform:0, 0.5\" means that at each node the mobile consumer is connecting to,\n\
+		they are in range of that node for x seconds as determined by the uniform probability distribution between 0 and 0.5.")
+		
+	p.add_argument("-r", "--range", type = str, default = "uniform:0, 2",
+		help = "\"distribution:distrubution values\"\n\
+		The probability distribution of each node's transmission range.\n\
+		Eg, the default: \"uniform:0, 2\" means that each node's transmission range is\n\
+		determined by the uniform probability distribution between 0 and 2.")
+		
+	p.add_argument("-v", "--velocity", type = str, default = "uniform:0, 2",
+		help = "\"number_to_gen:distribution:distrubution values\"\n\
+		The probability distribution of MC's velocity at each gateway connection.\n\
+		Eg, the default: \"uniform:0, 2\" means that at each node the mobile consumer is connecting to,\
+		they are travelling at a speed chosen by the uniform probability distribution between 0 and 2.")
+		
+	p.add_argument("-pnco", "--phone_node_connect_order", type = str, default = "3:uniform:0, 8",
+		help = "\"distribution:distrubution values\"\n\
+		The probability distribution for the pattern in which the mobile consumer\n\
+		will disconnect and re-connect to nodes in the topology.\n \
+		Eg, the default: \"3:uniform:0, 8\" means that the phone will select the next node \
+		to travel to by using the uniform probability distirbution between 0-8. It selects 3 times")
+		
+	p.add_argument("-d", "--delta", type = str, default = "3:uniform:0, 0.5",
+		help = "\"number_to_gen:distribution:distrubution values\"\n\
+		The probability distribution of deadline in seconds before the data expires.\n\
+		Eg, the default: \"3:uniform:0, 0.5\" means that the data packet must be received by the MC before \
+		the amount of seconds selected by the uniform probability distribution, between 0-0.5, \
+		before the MC moves and the interest is re-sent. This happens again 2 more times.")
+		
+	p.add_argument("-pt", "--phone_test", type = str, default = False,
+		help = "Toggle to determine whether the simulation will connect to the Android Phone \
+		to receive the initial interest packet and send final data. Default is False.")
+	p.add_argument("-ipt", "--iperf_test", type = str, default = False,
+		help = "Toggle to determine whether the simulation will generate dummy data or generate \
+		data via iperf3. Default is False.")
+	p.add_argument("-log", "--logging", type = str, default = False,
+		help = "Toggle to determine whether all logging information will be printed. Default is False.")
+	 
+	p.add_argument("-o", "--outfile", type = str, default = 'metric_outfile.csv',
+		help = "Output file for simulation metrics. Appended to if exists already, creates if not.")
+		
+		
+	#"--whatever "number_to_gen:distribution:distrubution values"	
+		
+	args = p.parse_args()
+	
+	if not (os.path.isfile(args.topfile)):
+		print("Specified topfile", args.topfile ,"does not exist")
+		exit()
+		
+	metrics_outfile = args.outfile
+	topfile = args.topfile
+	pktgen_num = args.pktgen_num
+	timeout = args.timeout
+	
+	# values generated later
+	weightdist = args.weights.split(":")
+	#weightfile = args.weightfile
+	linger_dist = args.linger.split(":")
+	trans_range_dist = args.range.split(":")
+	
+	# generate phone node connect order 
+	phone_node_connect_order = split_dist_string (args.phone_node_connect_order)
+	f = open(topfile, 'r')
+	data = f.read().split("\n")
+	nodemax = len(data)-2
+	f.close()
+	phone_node_connect_order = [min(int(x), nodemax) for x in phone_node_connect_order]
+	
+	# generate velocity values
+	velocity = split_dist_string (str(len(phone_node_connect_order))+":"+args.velocity)
+	
+		
+	# generate deltas 
+	delta = split_dist_string (args.delta)
+	
+	
+	if (args.phone_test in ["True", "true", "t", "T", "1", "on"]):
+		phone_test = True
+	else:
+		phone_test = False	
+	if (args.iperf_test in ["True", "true", "t", "T", "1", "on"]):
+		iperf_test = True
+	else:
+		iperf_test = False
+	if (args.logging in ["True", "true", "t", "T", "1", "on"]):
+		logging = True
+	else:
+		logging = False
+		
+	print("---")
+	print("CLI: python3 NDNsim.py -tp \"" +args.topfile+ \
+	"\" -w \"" +args.weights+ \
+	"\" -pgn \"" +str(args.pktgen_num)+ \
+	"\" -to \"" +str(args.timeout)+  \
+	"\" -l \"" +args.linger+ \
+	"\" -r \"" +args.range+ \
+	"\" -v \"" +args.velocity+ \
+	"\" -pnco \"" +args.phone_node_connect_order+\
+	"\" -d \"" +args.delta+ \
+	"\" -pt \"" +str(args.phone_test)+ \
+	"\" -ipt \"" +str(args.iperf_test)+ \
+	"\" -log \"" +str(args.logging)+ \
+	"\" -o \""+args.outfile+"\"\n")
+	
+	print("distributions: ")
+	print("weightdist:", weightdist)
+	print("linger_dist:", linger_dist)
+	print("trans_range_dist:", trans_range_dist)
+	print("velocity:", velocity)
+	print("phone_node_connect_order:", phone_node_connect_order)
+	print("delta:", delta)
+	return args
+
+#-------------------------------------------------------------------------------
+# argparse helper
+def split_dist_string(dist_string):
+	retval = []
+	temp = dist_string.split(":")
+	number_to_gen = int(temp[0])
+	pdist = temp[1]
+	pdist_params = list(map(float, temp[2].split(", ")))
+	for i in range(number_to_gen):
+		retval.append(distribution_helper(pdist, pdist_params))	
+	return retval
+
+#-------------------------------------------------------------------------------
 # MAIN
 if __name__ == "__main__":
 
-	readargs()
+	args = readargs()
 	
 	# starts iperf3 server if needed
 	if iperf_test:
@@ -805,7 +944,7 @@ if __name__ == "__main__":
 	# -----
 	# Read in topology & start threads for each node
 	# each thread has a node listening, then when packet is received, node threads to service it
-	topology = Topology(topfile, weightfile)
+	topology = Topology(topfile)
 	global_topology = topology
 	num_nodes = len(topology.nodes)
 	thread_list = []
@@ -818,7 +957,7 @@ if __name__ == "__main__":
 	
 	# -----
 	# Tests nodes 
-	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'test', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False))
+	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'test', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False, -1))
 	
 	# waits until all nodes are online
 	while node_init != 1:
@@ -867,16 +1006,16 @@ if __name__ == "__main__":
 	counter_x = 0
 	counter_delta = 0
 	timeout_counter = 0 
-	linger_timeout_counter = 0
+	alphaout_counter = 0
 	delta_timeout_counter = 0
 	internal_timeout_counter = 0
-	temp_linger_time = 0 # linger time after timeout
-	temp_linger_flag = False # determines when to use temp_linger_time
+	temp_alpha = 0 # linger time after timeout
+	temp_linger_flag = False # determines when to use temp_alpha
 	rec_data = False
+	original_delta = deepcopy(delta)
 	
 	# Sends interest packets until data is received or timeout occurs.
 	while True:
-		#time.sleep(5) #sleep to check for cache hit
 		phone_node_lock.acquire()
 		try:
 			phone_node = phone_node_connect_order[counter_x]
@@ -890,15 +1029,15 @@ if __name__ == "__main__":
 		total_packet_counter = total_packet_counter + 1
 		total_packet_counter_lock.release()
 		
-		# append expecting final data
-		final_data_lock.acquire() 
-		final_data.append([])
-		final_data_lock.release()
-		
 		# append counter for packets dropped for this interest
 		packet_drop_lock.acquire()
 		packet_drop.append([])
 		packet_drop_lock.release()
+		
+		# append expecting final data
+		final_data_lock.acquire() 
+		final_data.append([])
+		final_data_lock.release()
 		
 		# Sets a timer for each interest
 		start_time = time.time()
@@ -907,17 +1046,17 @@ if __name__ == "__main__":
 		timeout_check = False
 		temp_final_data = []
 		if temp_linger_flag == False: # calculate linger time
-			linger_time = calc_linger(topology.nodes[phone_node].transmission_range, velocity[counter_x])
+			alpha = calc_linger(topology.nodes[phone_node].transmission_range, velocity[counter_x])
 		else: # use updated linger time (resend occurred)
-			linger_time = temp_linger_time
+			alpha = temp_alpha
 			temp_linger_flag = False
 		curr_time = time.time()
 		end_time = curr_time + delta[counter_delta]
 		end_time_1 = curr_time + timeout 
-		end_time_2 = curr_time + linger_time 
+		end_time_2 = curr_time + alpha 
 		
 		# Sends interest packet from dummy node (-1) to access point (phone node)
-		send_packet(ip, port-1, port+phone_node+num_nodes, Packet(h_name, curr_time, 0, 0, linger_time, delta[counter_delta], velocity[counter_x], -1, "", 0.0001, -1, False))	
+		send_packet(ip, port-1, port+phone_node+num_nodes, Packet(h_name, curr_time, 0, 0, alpha, delta[counter_delta], velocity[counter_x], -1, "", 0.0001, -1, False, len(final_data)-1))	
 		
 		# loop until we reach delta, linger, or timeout (end time)
 		while ((curr_time <= end_time) and (curr_time <= end_time_1) and (curr_time <= end_time_2)):
@@ -953,10 +1092,10 @@ if __name__ == "__main__":
 				
 		elif curr_time >= end_time_2:
 			print("Linger time exceeded!")
-			timestamp.append("Linger Time Timeout: " + str(linger_time))
+			timestamp.append("Linger Time Timeout: " + str(alpha))
 			counter_x = counter_x + 1
 			timeout_counter = timeout_counter + 1
-			linger_timeout_counter = linger_timeout_counter + 1
+			alphaout_counter = alphaout_counter + 1
 			timeout_time.append(end_time_2)
 			if counter_x >= len(velocity):
 				print("Last linger time exceeded! Interest has failed!")
@@ -967,7 +1106,7 @@ if __name__ == "__main__":
 		elif curr_time >= end_time_1: # when to update the linger/delta
 			counter_x = counter_x + 0 # don't progress; resend instead
 			delta[counter_delta] = delta[counter_delta] - timeout #update delta and linger wrt how much time has passed already
-			temp_linger_time = linger_time - timeout
+			temp_alpha = alpha - timeout
 			temp_linger_flag = True
 			timeout_counter = timeout_counter + 1
 			internal_timeout_counter = internal_timeout_counter + 1
@@ -983,12 +1122,15 @@ if __name__ == "__main__":
 
 	# -----
 	# Sort the data
+	precache_check = True
 	if rec_data == True:
 		sorted_final_data = []
 		final_data_lock.acquire()
 		temp_final_copy = (deepcopy(final_data))[-1]
+		test_test = (deepcopy(final_data))
 		final_data_lock.release()
 		sort_counter = 0
+		
 		while len(temp_final_copy) != 0:
 			for y in range(len(temp_final_copy)):
 				if temp_final_copy[y].counter == sort_counter:
@@ -1013,11 +1155,13 @@ if __name__ == "__main__":
 				time.sleep(3)
 		print("")
 		
-		precache_check = True
+		
 		for x in range(len(sorted_final_data)):
 			if sorted_final_data[x].precache == False:
 				precache_check = False
 				break
+	else:
+		precache_check = False
 	
 	# close phone socket
 	if phone_test: 
@@ -1087,21 +1231,37 @@ if __name__ == "__main__":
 		f = open(metrics_outfile, 'a')
 	else: #if the file doesnt exist, create a new one and add the header
 		f = open(metrics_outfile, 'w')
-		f.write("Topfile, Weightfile, Pktgen_num, Timeout, Phone_node_connect_order, Velocity, Delta, Phone_test, iperf_test, End-To-End Delay, Total Number of Timeouts, Number of Linger Time Timeouts, Number of Delta Timeouts, Number of Internal Timeouts, Percent of dropped packets, Success?, Cache Hit?, Number of Cache Hits, Number of Times Precached\n")
-	temp_phone_node_connect_order = ""
-	temp_velocity = ""
-	for x in range(len(phone_node_connect_order)):
-		temp_phone_node_connect_order = temp_phone_node_connect_order + str(phone_node_connect_order[x])
-		temp_velocity = temp_velocity + str(velocity[x])
-		if x != len(phone_node_connect_order)-1:
-			temp_phone_node_connect_order = temp_phone_node_connect_order + " "
-			temp_velocity = temp_velocity + " "
-	temp_delta = ""
-	for x in range(len(delta)):
-		temp_delta = temp_delta + str(delta[x])
-		if x != len(delta)-1:
-			temp_delta = temp_delta + " "
-	f.write(topfile + ", " + weightfile + ", " + str(pktgen_num) + ", " + str(timeout) + ", " + str(temp_phone_node_connect_order) + ", " + str(temp_velocity) + ", " + str(temp_delta) + ", " +  str(phone_test) + ", " + str(iperf_test) + ", " + str(total_delay) + ", " + str(timeout_counter) + ", " + str(linger_timeout_counter) + ", " + str(delta_timeout_counter) + ", " + str(internal_timeout_counter) + ", " + str(dropped_counter/total_data_counter*100) + ", " + str(rec_data) + ", " + str(precache_check) + ", " + str(num_cache_hit) + ", " + str(num_precache) + "\n") 
+		f.write("Topfile, \
+weightdist, \
+Pktgen_num, \
+Timeout, \
+Linger_dist, \
+Linger, \
+Range_dist, \
+Velocity_dist,\
+Velocity, \
+Phone_node_connect_order_dist, \
+Phone_node_connect_order, \
+Delta_dist, \
+Delta, \
+Phone_test, iperf_test, \
+End-To-End Delay, Total Number of Timeouts, Number of Linger Time Timeouts, Number of Delta Timeouts, Number of Internal Timeouts, Percent of dropped packets, Success?, Cache Hit?, Number of Cache Hits, Number of Times Precached\n")
+	
+	f.write("\""+args.topfile+\
+	 "\", \"" +args.weights+\
+	  "\", \"" +str(args.pktgen_num)+\
+	   "\", \"" +str(args.timeout)+\
+	   "\", \"" +str(args.linger)+\
+	   "\", \"" +str(linger)+\
+	   "\", \"" +str(args.range)+\
+	 "\", \"" +args.velocity+\
+	  "\", \"" +str(velocity)+\
+	 "\", \"" +args.phone_node_connect_order+\
+	  "\", \"" +str(phone_node_connect_order)+\
+	 "\", \"" +args.delta+ "\", \"" +str(delta)+\
+	 "\", \"" +str(args.phone_test)+ "\", \"" +str(args.iperf_test)+ "\", "+\
+	
+	str(total_delay) + ", " + str(timeout_counter) + ", " + str(alphaout_counter) + ", " + str(delta_timeout_counter) + ", " + str(internal_timeout_counter) + ", " + str(dropped_counter/total_data_counter*100) + ", " + str(rec_data) + ", " + str(precache_check) + ", " + str(num_cache_hit) + ", " + str(num_precache) + "\n") 
 	
 	f.close()
 	os._exit(0)
