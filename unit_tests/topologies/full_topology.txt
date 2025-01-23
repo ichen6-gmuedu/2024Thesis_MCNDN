@@ -1,0 +1,8 @@
+VA/Fairfax/Safeway:xxx|yyy	0	VA/Fairfax/GMU/EEC	0	0	VA/Springfield	0	0	0
+VA/Fairfax/GMU/EEC:xxx|yyy	VA/Fairfax/Safeway	0	VA/Fairfax/GMU/CS	0	VA	0	0	0
+VA/Fairfax/GMU/CS:1R153AN|Irisean	0	VA/Fairfax/GMU/EEC	0	VA/Fairfax/GMU/SWE	0	VA/Fairfax/GMU	VA/Fairfax/GMU	0
+VA/Fairfax/GMU/SWE:xxx|yyy	0	0	VA/Fairfax/GMU/CS	0	0	0	0	VA/Fairfax
+VA/Springfield:xxx|yyy	VA/Fairfax/Safeway	VA/Fairfax/GMU/EEC	0	0	0	0	0	0
+VA/Fairfax/GMU:xxx|yyy	0	0	VA/Fairfax/GMU/CS	0	0	0	VA/Fairfax/GMU	0
+VA/Fairfax/GMU:xxx|yyy	0	0	VA/Fairfax/GMU/CS	0	0	VA/Fairfax/GMU	0	VA/Fairfax
+VA/Fairfax:xxx|yyy	0	0	0	VA/Fairfax/GMU/SWE	0	0	VA/Fairfax/GMU	0

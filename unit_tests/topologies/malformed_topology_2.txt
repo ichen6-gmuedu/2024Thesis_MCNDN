@@ -1,0 +1,2 @@
+VA/Fairfax/Safeway:xxx|yyy	0	VA/Fairfax/GMU/EEC	0
+VA/Fairfax/GMU/EEC:xxx|yyy	VA/Fairfax/Safeway	0	VA/Fairfax/GMU/CS

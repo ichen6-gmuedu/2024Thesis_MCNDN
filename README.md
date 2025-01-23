@@ -23,6 +23,10 @@ This simulation is created and tested in Linux and Android SDK only.
 ### Python Installation
 
 Install python via the python website. https://www.python.org/downloads/
+```
+sudo apt-get update
+sudo apt-get install python3.10.12
+```
 
 ### Android SDK Installation
 
@@ -44,6 +48,9 @@ To run the application on your Android device, debugging mode must be enabled. F
 ### Iperf3 Installation
 
 Install iperf3 via the iperf3 website. https://iperf.fr/iperf-download.php
+```
+sudo apt-get install iperf3
+```
 
 ## Running
 

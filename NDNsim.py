@@ -3,50 +3,25 @@
 #-------------------------------------------
 # IMPORTS
 
-from threading import Lock, Thread
-import socket, pickle, time
-from copy import deepcopy
-import subprocess
-import argparse
-import os
+import socket, pickle, time, subprocess, argparse, os
 import numpy as np
+from copy import deepcopy
+from threading import Lock, Thread
+from scipy.stats import uniform, norm, zipf
 #-------------------------------------------
 
 #-------------------------------------------
 # GLOBALS
 
-#Sockets
+#Socket config
 ip = 'localhost'
 port = 8080
 phone_ip =  '192.168.1.207' #'localhost' #'192.168.1.1'
 phone_port = 9095
 
-# Variables
-topfile = 'topology.txt'
-weightdist = 'uniform:0, 1'
-metrics_outfile = 'metric_outfile.csv'
-
-timeout = 5 #resend for packets if you dont receive in this amount of seconds
-# timeout scenario: data packet is dropped before delta/linger has expired, 
-# we want to resend so we might be able to get the data before delta/linger expires
-
-pktgen_num = 5 #how many packets to generate
+# Globals
 phone_node_connect_order_counter = 0 # index for mobile consumer location
-phone_node_connect_order = "uniform:0, 8" # connecting gateway after move
-velocity = "3:uniform:0, 0.5" # velocity at each gw connection (DUMMY)
-delta = "3:uniform:0, 0.5" # data deadline in seconds until we move
-linger_dist = "uniform:0, 8" #distribution probability for linger time (DUMMY)
-linger = [] # keeping track of "calculated" linger times for logging
-trans_range_dist = "uniform:0, 8" #distribution probability for node range (DUMMY)
-
-
 global_topology = [] #for dijkstras
-num_nodes = -1 #number of nodes in the topology
-client = "" # later assigned as subprocess
-
-# Toggles
-phone_test = False
-iperf_test = False 
 logging = True
 
 #Locks
@@ -57,8 +32,6 @@ phone_node_lock = Lock() #lock for updating the phone node
 final_data = [] #so we can pull the data from a thread
 final_data_lock = Lock() #lock for updating the data
 print_lock = Lock() #lock for updating the data
-
-# Metrics
 total_packet_counter = 0 #number of total interests out
 total_packet_counter_lock = Lock() #lock to track the total number of return packets
 packet_drop = [] #number of packets dropped
@@ -75,10 +48,9 @@ num_cache_hit_lock = Lock() #lock for number of cache hits that occured
 #-------------------------------------------------------------------------------
 # Hybrid name
 # contains some redundant fields (hierarchical and flat component)
-# for the sake of simpler fetching...
-# TODO: functions for fetching fields to get rid of redundant fields
 class Hybrid_Name:
-	def __init__(self, task, device_name, data_hash, hierarchical_component, flat_component):
+	#phone_data = 'VA/Fairfax/GMU/CS/actionOn:1R153AN' #how the data appears raw
+	def __init__(self, task: str='actionOn', device_name: str='1R153AN', data_hash: str='', hierarchical_component: str='VA/Fairfax/GMU/CS', flat_component: str='1R153AN'):
 		self.task = task #can be either actionOn or sensing (hardcode to actionOn)
 		self.device_name = device_name #data name hash (interest and data packet)
 		self.data_hash = data_hash #data hash (data packet only)
@@ -90,108 +62,25 @@ class Hybrid_Name:
 	def print_info(self):
 		print("Task: " + self.task)
 		print("Device Name: " + self.device_name)
-		print("Data_hash: " + str(self.data_hash))
+		print("Data Hash: " + str(self.data_hash))
 		print("Hierarchical Component: " + self.hierarchical_component)
 		print("Flat Component: " + self.flat_component)
 
-#-------------------------------------------------------------------------------
-# Pit entry
-# contains fields relevant to PIT entry and some metrics
-# total: keeps track of how many returning data packets we've seen
-class PIT_Entry:
-	def __init__(self, incoming_interface, data_name, total):
-		self.incoming_interface = incoming_interface #int - number of node we just came from
-		self.data_name = data_name #Hybrid_Name object
-		self.total = total #total number of instances of a packet we have seen
-	
-	#-------------------------------------------
-	# Prints Hybrid name in a formatted way
-	def print_info(self):
-		print("Incoming Interface: " + str(self.incoming_interface))
-		print("Hierarchical Name Info Start")
-		self.data_name.print_info()
-		print("Hierarchical Name Info End")
-		print("Total Counter: " + str(self.total))
-	
-#-------------------------------------------------------------------------------
-# Cache entry
-# Assumptions: infinite TTL, infinite cache size, no eviction policy
-# Assumptions: Only precaching, not caching
-# Assumptions: 1 cache entry is all the packets 
-# Assumptions: Each cache entry has unique name (no dupes)
-# Contains fields relevant to cache
-class Cache_Entry:
-	def __init__(self, data_name, packet):
-		self.data_name = data_name #Hybrid_Name object
-		self.packets = packet #array of packets of data chunks for this data
-		
-	#-------------------------------------------
-	# Prints Hybrid name in a formatted way
-	def print_info(self):
-		print("Hybrid Name Info Start")
-		self.data_name.print_info()
-		print("Hybrid Name Info End")
-		for x in range(len(self.packets)):
-			print(self.packets[x].print_info())
-			print("")
-			
-#-------------------------------------------------------------------------------
-# Node
-# Represenetative of nodes (routers) in a topology
-# Contains FIB, PIT, Cache, and values necessary to have it interact with other nodes
-# IP; Port: allow other nodes to connect to this node for communication
-# number: an ID that allows us to shut down the node (close threads and sockets) upon completion
-# data_name: the data that this node is able to satisfy
-class Node:	
-	def __init__(self, IP, port, number, data_name, PIT_lock, cache_lock, FIB, weights, PIT, cache):
-		self.IP = IP #IP for node
-		self.port = port #port for node
-		self.number = number #node identifier
-		self.data_name = data_name #Hybrid_Name object
-		self.PIT_lock = PIT_lock #lock for updating PIT
-		self.cache_lock = cache_lock #lock for updating cache
-		self.weights = weights # for dijkstras calc; transmission rate 
-		self.FIB = FIB
-		self.PIT = PIT
-		self.cache = cache	
-		self.transmission_range = 10 #hardcode the range to 10 units
-		
-	#-------------------------------------------
-	# Prints Hybrid name in a formatted way
-	def print_info(self):
-		print("IP:" + self.IP)
-		print("Port: " + str(self.port))
-		print("Number: " + str(self.number))
-		print("Hierarchical Name Info Start")
-		self.data_name.print_info()
-		print("Hierarchical Name Info End")
-		print("Weights: " + str(self.weights))
-		print("FIB: " + str(self.FIB))
-		print("PIT: ")
-		for x in range(len(self.PIT)):
-			print(self.PIT[x].print_info())
-			print("")
-		print("Cache: ")
-		for x in range(len(self.cache)):
-			print(self.cache[x].print_info())
-			print("")
-		print("Transmission Range: " + str(self.transmission_range))
-		
 #-------------------------------------------------------------------------------
 # Packet
 # Interest or Data packet that stores the hybrid name
 # interest if data name has no data_hash, data if it does
 # total_packets: tells PIT how many packets to expect
 class Packet:
-	def __init__(self, name, time, total_packets, counter, alpha, delta, velocity, total_size, payload, lambda_, destination, precache, number):
+	def __init__(self, name: Hybrid_Name=None, time: float=0.0, total_packets: int=-1, counter: int=-1, alpha: float=0.0, delta: float=0.0, velocity: float=0.0, total_size: int=0, payload: str='', lambda_: float=0.0, destination: int=-1, precache: bool=False, number: int=0):
 		self.name = name #Hybrid_Name object
 		
-		# interest packet only
+		# interest packet
+		self.time = time #time we sent the packet
 		self.alpha = alpha #linger time
 		self.delta = delta #delta
 		self.velocity = velocity #v
 		self.lambda_ = lambda_ # transmission rate of everything so far.
-		self.time = time #time we sent the packet
 		
 		# data packet only
 		self.total_packets = total_packets #signifies how many sub packets make up the total data
@@ -205,19 +94,116 @@ class Packet:
 	#-------------------------------------------
 	# Prints Hybrid name in a formatted way
 	def print_info(self):
-		print("Hierarchical Name Info Start")
-		self.name.print_info()
-		print("Hierarchical Name Info End")
+		if self.name != None:
+			print("Hierarchical Name Info Start")
+			self.name.print_info()
+			print("Hierarchical Name Info End")
+		else:
+			print("No Hierarchical Name!")
+		print("Time packet sent: " + str(self.time))
 		print("Total Packets : " + str(self.total_packets))
 		print("Counter: " + str(self.counter))
-		print("Linger Time: " + str(self.alpha))
+		print("Alpha/Linger Time: " + str(self.alpha))
 		print("Delta: " + str(self.delta))
 		print("Velocity: " + str(self.velocity))
 		print("Total Size: " + str(self.total_size))
 		print("Payload: " + str(self.payload))
-		print("lambda_: " + str(self.lambda_))
+		print("Lambda: " + str(self.lambda_))
 		print("Destination: " + str(self.destination))
 		print("Precache: " + str(self.precache))
+		print("Number (for grouping): " + str(self.number))
+
+#-------------------------------------------------------------------------------
+# Pit entry
+# contains fields relevant to PIT entry and some metrics
+# total: keeps track of how many returning data packets we've seen
+class PIT_Entry:
+	def __init__(self, data_name: Hybrid_Name=None, total: int=0, incoming_interface: int=-1):
+		self.data_name = data_name #Hybrid_Name object
+		self.total = total #total number of instances of a packet we have seen
+		self.incoming_interface = incoming_interface #int - number of node we just came from
+			
+	#-------------------------------------------
+	# Prints Hybrid name in a formatted way
+	def print_info(self):
+		if self.data_name != None:
+			print("Hierarchical Name Info Start")
+			self.data_name.print_info()
+			print("Hierarchical Name Info End")
+		else:
+			print("No Hierarchical Name!")
+		print("Total Counter: " + str(self.total))
+		print("Incoming Interface: " + str(self.incoming_interface))
+	
+#-------------------------------------------------------------------------------
+# Cache entry
+# Assumptions: infinite TTL, infinite cache size, no eviction policy
+# Assumptions: Only precaching, not caching
+# Assumptions: 1 cache entry is all the packets 
+# Assumptions: Each cache entry has unique name (no dupes)
+# Contains fields relevant to cache
+class Cache_Entry:
+	def __init__(self, data_name: Hybrid_Name=None, packet: list=[]):
+		self.data_name = data_name #Hybrid_Name object
+		self.packets = packet #array of packets of data chunks for this data
+		
+	#-------------------------------------------
+	# Prints Hybrid name in a formatted way
+	def print_info(self):
+		if self.data_name != None:
+			print("Hierarchical Name Info Start")
+			self.data_name.print_info()
+			print("Hierarchical Name Info End")
+		else:
+			print("No Hierarchical Name!")
+		for x in range(len(self.packets)):
+			self.packets[x].print_info()
+			print("")
+			
+#-------------------------------------------------------------------------------
+# Node
+# Represenetative of nodes (routers) in a topology
+# Contains FIB, PIT, Cache, and values necessary to have it interact with other nodes
+# IP; Port: allow other nodes to connect to this node for communication
+# number: an ID that allows us to shut down the node (close threads and sockets) upon completion
+# data_name: the data that this node is able to satisfy
+class Node:	
+	def __init__(self, IP: str='127.0.0.1', port: int=9999, number: int=-1, data_name: Hybrid_Name=None, PIT_lock: Lock=None, cache_lock: Lock=None, FIB: list=[], weights: list=[], PIT: list=[], cache: list=[], transmission_range: float=-1.0):
+		self.IP = IP #IP for node
+		self.port = port #port for node
+		self.number = number #node identifier
+		self.data_name = data_name #Hybrid_Name object
+		self.PIT_lock = PIT_lock #lock for updating PIT
+		self.cache_lock = cache_lock #lock for updating cache
+		self.FIB = FIB
+		self.weights = weights # for dijkstras calc; transmission rate 
+		self.PIT = PIT
+		self.cache = cache	
+		self.transmission_range = transmission_range
+		
+	#-------------------------------------------
+	# Prints Hybrid name in a formatted way
+	def print_info(self):
+		print("IP: " + self.IP)
+		print("Port: " + str(self.port))
+		print("Number: " + str(self.number))
+		if self.data_name != None:
+			print("Hierarchical Name Info Start")
+			self.data_name.print_info()
+			print("Hierarchical Name Info End")
+		else:
+			print("No Hierarchical Name!")
+		print("FIB: " + str(self.FIB))
+		print("Weights: " + str(self.weights))
+		print("PIT: ")
+		for x in range(len(self.PIT)):
+			self.PIT[x].print_info()
+			print("")
+		print("Cache: ")
+		for x in range(len(self.cache)):
+			self.cache[x].print_info()
+			print("")
+		print("Transmission Range: " + str(self.transmission_range))
 		
 #-------------------------------------------------------------------------------
 # Topology 
@@ -225,42 +211,58 @@ class Packet:
 # The topology is N x N where N is the number of nodes
 # Initiates and stores each node in topology in self.nodes
 class Topology:
-	def __init__(self, file): #pass in a file, set up nodes
-		global weightdist, logging, trans_range_dist
+	def __init__(self, file: str='', weightdist: list=["uniform","0, 1"], trans_range_dist: list=["uniform","0, 8"]):
+		self.file = file
+		self.weightdist = weightdist
+		self.trans_range_dist = trans_range_dist
 		self.nodes = []
-		self.weights = []
-		self.NDN_FIB = [] #for NDN forwarding
+		self.weights = [] #complete weights
+		self.NDN_FIB = [] #complete FIB
+		self.read_in_file()
+	
+	#loads and initializes the topology
+	def read_in_file(self):	
+		wdist_str = self.weightdist[0]
+		wdist_param = list(map(float, self.weightdist[1].split(", ")))
 		
-		wdist_str = weightdist[0]
-		wdist_param = list(map(float, weightdist[1].split(", ")))
-		
-		tr_dist_str = trans_range_dist[0]
-		tr_dist_param = list(map(float, trans_range_dist[1].split(", ")))
-		
+		tr_dist_str = self.trans_range_dist[0]
+		tr_dist_param = list(map(float, self.trans_range_dist[1].split(", ")))
+	
 		#Reads in the topology
-		f = open(file, 'r')
+		try:
+			f = open(self.file, 'r')
+		except:
+			print("Error! File does not exist!")
+			exit(1)
 		counter = 0
-		i = 0
 		while True:
 			data = f.readline()
 			if not data:
 				break
+				
+			#Weights and FIB
 			line = data.split('\t')
 			FIB = line[1:]
 			temp_FIB = deepcopy(FIB)
 			temp_weights = []
 			for x in range(len(temp_FIB)):
-				if temp_FIB[x].rstrip() == "0":
-					temp_FIB[x] = 0
+				temp_FIB[x] = temp_FIB[x].rstrip()
+				if temp_FIB[x] == "0":
 					temp_weights.append(-1)
 				else:
-					temp_weights.append(distribution_helper(wdist_str, wdist_param))
-				if (x == i):
+					temp_weights.append(distribution_helper(wdist_str, wdist_param, False))
+				if (x == counter):
 					temp_weights[x] = 0
+				if x < counter:
+					try:
+						temp_weights[x] = self.weights[x][counter]
+					except:
+						print("Error! Number of rows exceeds number of columns")
+						f.close()
+						exit(1)
 				
 			self.weights.append(temp_weights)
 			self.NDN_FIB.append(temp_FIB)
-			
 			
 			# Accepts formatting of hybrid name
 			name = line[0]
@@ -273,69 +275,44 @@ class Topology:
 			# initializes hybrid name
 			h_name = Hybrid_Name("", device_name, data_hash, hierarchical_component, flat_component)
 			
-			# Strips FIB and initializes node
-			for x in range(len(FIB)):
-				FIB[x] = FIB[x].rstrip()
-			temp_node = Node(ip, port + counter, counter, h_name, Lock(), Lock(), FIB, [], [], [])
+			# initializes node
+			temp_node = Node(ip, port + counter, counter, h_name, Lock(), Lock(), temp_FIB, temp_weights, [], [], distribution_helper(tr_dist_str, tr_dist_param, False))
 			
 			# keeps track of what port to connect to next 
 			counter = counter + 1
 			self.nodes.append(temp_node)
-			self.nodes[i].weights = temp_weights
 			
-			# generate tranmission range probability distribution 
-			self.nodes[i].transmission_range = (distribution_helper(tr_dist_str, tr_dist_param))
-			
-			i = i+1
 		f.close()
 		
-		
-		
-		
-		#Reads in the weights
-		"""
-		f = open(file_2, 'r')
-		counter = 0
-		while True:
-			data = f.readline()
-			if not data:
-				break
-			line = data.split('\t')
-			line = line[1:]
-			line = [int(x) for x in line]
-			self.weights.append(line)
-			self.nodes[counter].weights = line
-			counter = counter + 1
-		f.close()
-		"""
-		
-		#assertions : make sure the weights and FIB have matching topologies
+		#Assertions : make sure the weights and FIB have matching topologies
 		if len(self.nodes) != len(self.weights) and len(self.nodes) != len(self.NDN_FIB):
-			print("Error! Differing amount of rows for nodes and weights!")
+			print("Error! Differing amount of rows for nodes and weights")
 			exit(1)
 		for x in range(len(self.weights)):
 			if len(self.nodes) != len(self.weights[x]) and len(self.nodes) != len(self.NDN_FIB[x]):
-				print("Error! Differing amount of columns for nodes and weights!")
+				print("Error! Differing amount of columns for nodes and weights")
 				exit(1)	
 			for y in range(len(self.weights[x])):
 				if x == y and self.weights[x][y] != 0:
-					print("Error! Non-zero value detected for sending to yourself!")
+					print("Error! Non-zero value detected for sending to yourself")
 					exit(1)
-				if ((self.weights[x][y] == -1 and self.NDN_FIB[x][y] != 0) or (self.weights[x][y] != -1 and self.NDN_FIB[x][y] == 0)) and x != y:
-					print("Error! FIB entry provided in topology doesn't have matching weight!")
+				if ((self.weights[x][y] == -1 and self.NDN_FIB[x][y] != "0") or (self.weights[x][y] != -1 and self.NDN_FIB[x][y] == "0")) and x != y:
+					print("Error! FIB entry provided in topology doesn't have matching weight")
 					exit(1)
-		if(not logging):
-			print("---")
-			print("weights")
-			for i in range(len(self.NDN_FIB)):
-				#for j in range(len(self.NDN_FIB[i])):
-				#	print(self.NDN_FIB[i][j], end="\t")
-				#print()
-				for j in range(len(self.NDN_FIB[i])):
-					print(round(self.weights[i][j], 2), end="\t")
-				print()
 					
-
+	#-------------------------------------------
+	# Prints Hybrid name in a formatted way
+	def print_info(self):
+		print("File: " + self.file)
+		print("Weight Dist: ", self.weightdist)
+		print("Transmission Range Dist: ", self.trans_range_dist)
+		print("Nodes: ")
+		for x in range(len(self.nodes)):
+			self.nodes[x].print_info()
+			print("")
+		print("Weights: ", self.weights)
+		print("FIB: ", self.NDN_FIB)
+		
 #-------------------------------------------
 # FUNCTIONS
 
@@ -348,51 +325,64 @@ def print_info_helper(value):
 	
 #-------------------------------------------------------------------------------
 #Distribution helper
-def distribution_helper(distribution, values):
-	if distribution == "uniform":
-		# expected values are lower bounds and upper bounds
-		return abs(np.random.uniform(low=values[0], high=values[1]))
-	if distribution == "gaussian" or distribution == "normal":
-		# expected values are mean and std
-		return abs(np.random.normal(loc=values[0], scale=values[1]))
+def distribution_helper(distribution: str, values: list, cdf: bool) -> float:
+	#Parameter checking
+	for x in values:
+		if x < 0:
+			print("Error! One or more values is negative")
+			exit(1)
+	if distribution == "uniform" or distribution == "gaussian" or distribution == "normal":
+		if len(values) != 2:
+			print("Error! Values must be a list of len 2 for uniform or gaussian distribution")
+			exit(1)
 	if distribution == "zipf":
-		# expected value is distribution parameter
-		return abs(np.random.zipf(a=values[0]))
-	
-#-------------------------------------------------------------------------------	
-# Send packet
-# Given source and dest port, connect, send packet, and disconnect  
-def send_packet(ip, src_port, dest_port, packet):
-	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-	client.bind((ip, src_port)) # connect
-	success = False
-	while True: # keep trying to connect until it works
-		try:
-			client.connect((ip, dest_port))
-			success = True
-			break
-		except:
-			continue
-	data_to_send = pickle.dumps(packet) 
-	client.send(data_to_send) # send data as pickle
-	client.close() # disconnect
-	
-#-------------------------------------------------------------------------------
-# close threads
-# sends 'close' message to all nodes until all nodes and threads are closed
-def close_threads(thread_list):
-	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'close', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False, -1))
-	for x in range(len(thread_list)):
-			thread_list[x].join()
-	print("All nodes offline")
+		if len(values) != 1:
+			print("Error! Values must be a list of len 1 for zipf")
+			exit(1)	
+
+	if distribution == "uniform":
+		if values[1] < values[0]:
+			print("Error! Maximum value larger than minimum value")
+			exit(1)
+		number = uniform.rvs(values[0], values[1]-values[0]) # expected values are lower bounds and range (upper bounds + lower bounds)
+		if cdf == False:
+			return number
+		else:
+			if values[1] == values[0]:
+				return 1.0
+			else:
+				return uniform.cdf(number, values[0], values[1]-values[0])
+
+	elif distribution == "gaussian" or distribution == "normal":
+		number = values[0]
+		if values[1] != 0:
+			number = norm.rvs(values[0], values[1]) # expected values are mean and std
+		if cdf == False:
+			return number
+		else:
+			if values[1] != 0:
+				return norm.cdf(number, values[0], values[1])
+			else:
+				return 1.0
+			
+	elif distribution == "zipf":
+		if values[0] <= 1:
+			print("Error! a must be greater than 1")
+			exit(1)
+		number = zipf.rvs(values[0]) # expected value is distribution parameter
+		if cdf == False:
+			return number
+		else:
+			return zipf.cdf(number, values[0])
+			
+	else:
+		print("Error! Unrecognized distribution")
+		exit(1)	
 
 #-------------------------------------------------------------------------------
 # generate packets
-# returns a list of data_names
-def generate_packets(packet, data_name):
-	global pktgen_num
-	global client
+# returns a list of packets and where to send them
+def generate_packets(packet: Packet, pktgen_num: int, client: str, iperf_test: bool):
 	new_packets = []
 	total_size = 0
 	
@@ -400,18 +390,18 @@ def generate_packets(packet, data_name):
 	# CHANGED: simply fetch data rather than generate
 	if iperf_test:
 		# chop up iperf results into pkSize and append
-		pkSize = 600 #1024 doesn't work because of unpickling error
-		total_size = len(client.stdout)
-		for i in range(0,len(client.stdout), pkSize):
+		pkSize = 256 #1024 doesn't work because of unpickling error
+		total_size = len(client)
+		for i in range(0,len(client), pkSize):
 			temp_packet = deepcopy(packet)
-			temp_packet.name.data_hash = hash(client.stdout)
-			if(i+pkSize >= len(client.stdout)):
-				temp_packet.payload = client.stdout[i:len(client.stdout)]
+			temp_packet.name.data_hash = hash(client)
+			if(i+pkSize >= len(client)):
+				temp_packet.payload = client[i:len(client)]
 			else:
-				temp_packet.payload = client.stdout[i:i+pkSize]
-			temp_packet.total_size = len(client.stdout)
+				temp_packet.payload = client[i:i+pkSize]
+			temp_packet.total_size = len(client)
 			new_packets.append(temp_packet)
-	
+			
 	# if testing dummy data, new packets are just str of number
 	else:
 		total_size = pktgen_num
@@ -433,8 +423,7 @@ def generate_packets(packet, data_name):
 # Next Gateway
 # determines where we are going next
 # returns destination gateway ID
-# TODO: currently hardcoded
-def next_gateway(current_node, velocity):
+def next_gateway(current_node, velocity, phone_node_connect_order):
 	global phone_node_connect_order_counter
 	ret_value = 0
 	try:
@@ -442,18 +431,15 @@ def next_gateway(current_node, velocity):
 		ret_value = phone_node_connect_order[phone_node_connect_order_counter]
 		return ret_value
 	except:
-		return phone_node_connect_order[-1]
+		return -1
 	return ret_value	
 	
 #-------------------------------------------------------------------------------
 # Calculates the linger time 
-# TODO: currently hardcoded
-def calc_linger(transmission_range, velocity):
-	global linger_dist, linger
+def calc_linger(transmission_range, velocity, linger_dist):
 	pdist = linger_dist[0]
 	pdist_params = list(map(float, linger_dist[1].split(", ")))
-	linger.append(distribution_helper(pdist, pdist_params))
-	return linger[len(linger)-1]
+	return distribution_helper(pdist, pdist_params, False)
 	
 #-------------------------------------------------------------------------------
 # dijkstras
@@ -494,7 +480,7 @@ def dijkstras(x, y, topology):
 		link_weight = 0
 		for b in range(len(viable_routes[a])):
 			try:
-				link_weight = link_weight + 1/topology.weights[viable_routes[a][b]][viable_routes[a][b+1]]
+				link_weight = link_weight + 1/topology.weights[viable_routes[a][b]][viable_routes[a][b+1]] #1/n because faster rate means lower number
 			except:
 				break
 		if smallest_val == -1 or link_weight < smallest_val:
@@ -502,12 +488,109 @@ def dijkstras(x, y, topology):
 			ret_route = viable_routes[a]
 	
 	return ret_route, smallest_val, ret_route[1]
+
+#-------------------------------------------------------------------------------
+# argparse helper
+def split_dist_string(dist_string):
+	retval = []
+	temp = dist_string.split(":")
+	number_to_gen = int(temp[0])
+	pdist = temp[1]
+	pdist_params = list(map(float, temp[2].split(", ")))
+	for i in range(number_to_gen):
+		retval.append(distribution_helper(pdist, pdist_params, False))	
+	return retval
+	
+#-------------------------------------------------------------------------------
+# does the precaching		
+def precache_helper(location, node, packet, new_packets, precache_dist, failure_range, phone_node_connect_order):
+	global num_precache
+	ret_Fail = True
+
+	#find the number of hops from current to new dest
+	new_destination = next_gateway(node, packet.velocity, phone_node_connect_order) 
+	if new_destination == -1:
+		return [], [], True
+	num_hops = len(dijkstras(node.number, new_destination, global_topology)[0]) 
+	
+	#calculate the odds of failure
+	failure_range_values = list(map(float, failure_range.split(", "))) #range of values (ie. [40-60])
+	failure_chance = pow(failure_range_values[1], num_hops)
+	
+	precache_dist_values = list(map(float, precache_dist[1].split(", ")))
+	precache_roll = distribution_helper(precache_dist[0], precache_dist_values, True)
+	
+	if precache_roll < failure_chance:
+		print("Expected link failure! Sending via Infrastructure!")
+		ret_Fail = False
+		
+	packets_to_append = []
+	nodes_to_append = []
+	if logging:
+		if location == "cache":
+			print("Precaching from cache!")
+		else:
+			print("Precaching from producer to node", new_destination, "!")	
+	num_precache_lock.acquire()
+	num_precache = num_precache + 1
+	num_precache_lock.release()
+	temp_next = -1
+	if ret_Fail == True:
+		temp_next = dijkstras(node.number, new_destination, global_topology)[2] #find the next hop
+	else:
+		temp_next = new_destination
+	for x in range(len(new_packets)): #adding new packets and destination
+		temp_packet = deepcopy(new_packets[x])
+		temp_packet.destination = new_destination
+		temp_packet.precache = True
+		packets_to_append.append(temp_packet)
+		nodes_to_append.append(temp_next)	
+	return packets_to_append, nodes_to_append, ret_Fail	
+	
+#-------------------------------------------------------------------------------	
+# Send packet
+# Given source and dest port, connect, send packet, and disconnect  
+def send_packet(ip, src_port, dest_port, packet, failure=True, failure_range="0, 0", failure_dist=["uniform", "0, 0.5"]):
+
+	#Link failure
+	if failure == True:
+		failure_dist_values = list(map(float, failure_dist[1].split(", "))) #information about ditribution
+		failure_range_values = list(map(float, failure_range.split(", "))) #range of values (ie. [40-60], uniform distribution
+		failure_roll = distribution_helper(failure_dist[0], failure_dist_values, True) #single value based on distribution
+		range_roll = distribution_helper("uniform", failure_range_values, False) #single value based on range
+		if failure_roll < range_roll and (packet.name.hierarchical_component != 'close' and packet.name.hierarchical_component != 'test'):
+			print("Link failure!")
+			return
+			
+	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+	client.bind((ip, src_port)) # connect
+	while True: # keep trying to connect until it works
+		try:
+			client.connect((ip, dest_port))
+			break
+		except:
+			continue
+	
+	data_to_send = pickle.dumps(packet) 
+	client.send(data_to_send) # send data as pickle
+	client.close() # disconnect
+	
+#-------------------------------------------------------------------------------
+# close threads
+# sends 'close' message to all nodes until all nodes and threads are closed
+def close_threads(thread_list, failure_range, failure_dist):
+	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'close', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False, -1), False, failure_range, failure_dist)
+	for x in range(len(thread_list)):
+			thread_list[x].join()
+	print("All nodes offline")
+
 #-------------------------------------------------------------------------------
 # Socket code
 # Given a node, open server sockets to listen for connections
 # When packet is received, close socket and Thread to process the packet
 # When 'close' is receieved, shutdown the socket and child threads
-def socket_code(node):
+def socket_code(node, pktgen_num, precache_dist, client, failure_range, failure_dist, iperf_test, phone_node_connect_order, num_nodes):
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # allows us to reuse socket for next run
 		s.bind((node.IP, node.port))
@@ -526,7 +609,7 @@ def socket_code(node):
 				print("Node " + str(node.number) + " received data from Node " + str(addr[1]-port))
 				
 			# thread to process the packet (Cache, PIT, FIB stuff)
-			t1 = Thread(target=service_connection, args=[packet, node, addr[1]-port])
+			t1 = Thread(target=service_connection, args=[packet, node, addr[1]-port, pktgen_num, precache_dist, client, failure_range, failure_dist, iperf_test, phone_node_connect_order, num_nodes])
 			t1.start()
 			
 			# Closes child threads if we're done
@@ -535,12 +618,13 @@ def socket_code(node):
 				break
 		s.shutdown(socket.SHUT_RDWR)
 		s.close()
-		
+			
 #-------------------------------------------------------------------------------
 # Service connection
 # When a packet has been receivd at a node, we process it
-def service_connection(packet, node, previous_node):
-	global node_init, node_init_lock, final_data, final_data_lock, logging, num_cache_hit, num_precache
+def service_connection(packet, node, previous_node, pktgen_num, precache_dist, client, failure_range, failure_dist, iperf_test, phone_node_connect_order, num_nodes):
+	global node_init, final_data, logging, num_cache_hit, num_precache
+	ret_Fail = True
 	
 	# -----
 	# If the packet is 'test' or 'close', don't do any NDN processes
@@ -550,7 +634,7 @@ def service_connection(packet, node, previous_node):
 			
 		# If there are still nodes to be tested or closed, send it to the next node in line (indicated by port) 
 		if num_nodes != node.number + 1:
-			send_packet(ip, port+node.number, port+node.number+num_nodes+1, packet)
+			send_packet(ip, port+node.number, port+node.number+num_nodes+1, packet, False, failure_range, failure_dist)
 		# if no more nodes need to be tested or closed, flip node_init flag 
 		else:
 			node_init_lock.acquire()
@@ -564,7 +648,6 @@ def service_connection(packet, node, previous_node):
 	# If the packet is not 'test' or 'close', begin NDN process
 	else:
 		cache_hit = -1
-		precache = False
 		next_node = [] # next node to send to, is list for sending multiple packets
 		new_packets = []
 		# -----
@@ -582,11 +665,8 @@ def service_connection(packet, node, previous_node):
 						print("Cache entry match!")
 					if len(local_cache[x].packets) == local_cache[x].packets[0].total_packets: 
 						cache_hit = x		
-						# no precaching if delta timeout or were at the last connection
-						if not ((local_cache[x].packets[0].total_size/packet.lambda_) + (time.time()-packet.time) < packet.alpha) and phone_node_connect_order_counter != len(phone_node_connect_order)-1:
-							precache = True
 						break
-					if logging:
+					elif logging:
 						print("Cache entry is missing data")
 		# -----
 		# If we are an interest packet AND .. a cache hit occured OR we are at the producer	
@@ -607,44 +687,26 @@ def service_connection(packet, node, previous_node):
 					next_node.append(previous_node) #always send back (clear PITs)
 				final_data_lock.release()
 				node.cache_lock.release()
-				if precache == True:
-					if logging:
-						print("Precaching from cache!")
-					num_precache_lock.acquire()
-					num_precache = num_precache + 1
-					num_precache_lock.release()
-					new_destination = next_gateway(node, packet.velocity) 
-					temp_next = dijkstras(node.number, new_destination, global_topology)[2] #find the next hop
-					for x in range(len(new_packets)): #adding new packets and destination
-						temp_packet = deepcopy(new_packets[x])
-						temp_packet.destination = new_destination
-						temp_packet.precache = True
-						new_packets.append(temp_packet)
-						next_node.append(temp_next)
+				
+				#Precache
+				if not ((local_cache.packets[0].total_size/packet.lambda_) + (time.time()-packet.time) < packet.alpha):
+					packets_to_append, nodes_to_append, ret_Fail = precache_helper("cache", node, packet, new_packets, precache_dist, failure_range, phone_node_connect_order)
+					new_packets = new_packets + packets_to_append
+					next_node = next_node + nodes_to_append
 			
 			else: # Not a cache hit, append node's data as payload in packet and add data_hash to data_name
 				if logging:
 					print("Reached Producer")
-				new_packets, total_size = generate_packets(packet, node.data_name) # generates data packets to be sent
+				new_packets, total_size = generate_packets(packet, pktgen_num, client, iperf_test) # generates data packets to be sent
 				for x in range(len(new_packets)):
 					next_node.append(previous_node) #always send back 
-				# if sending to original won't meet delta/linger requirement --> precache
+
+				#Precache
 				if not ((total_size/packet.lambda_) + (time.time()-packet.time) < packet.alpha):
-					if phone_node_connect_order_counter != len(phone_node_connect_order)-1: #dont precache if last connection
-						new_destination = next_gateway(node, packet.velocity)
-						if logging:
-							print("Precaching from producer to node", new_destination, "!")
-						num_precache_lock.acquire()
-						num_precache = num_precache + 1
-						num_precache_lock.release()
-						temp_next = dijkstras(node.number, new_destination, global_topology)[2]
-						for x in range(len(new_packets)): #adding new packets and destination
-							temp_packet = deepcopy(new_packets[x])
-							temp_packet.destination = new_destination
-							temp_packet.precache = True
-							new_packets.append(temp_packet)
-							next_node.append(temp_next)
-		
+					packets_to_append, nodes_to_append, ret_Fail  = precache_helper("producer", node, packet, new_packets, precache_dist, failure_range, phone_node_connect_order)
+					new_packets = new_packets + packets_to_append
+					next_node = next_node + nodes_to_append
+
 		# -----
 		# If we are a data packet
 		elif packet.payload != "":
@@ -691,13 +753,13 @@ def service_connection(packet, node, previous_node):
 				if node.PIT[x].data_name.hierarchical_component == packet.name.hierarchical_component and node.PIT[x].data_name.device_name == packet.name.device_name:
 					print("Interest Collapsed!")
 					collapse = True
-					node.PIT.append(PIT_Entry(previous_node, packet.name, deepcopy(node.PIT[x].total))) #record in PIT
+					node.PIT.append(PIT_Entry(packet.name, deepcopy(node.PIT[x].total), previous_node)) #record in PIT
 					node.PIT_lock.release()
 					break 
 			
 			# If no collapsing, record in PIT
 			if collapse == False:
-				node.PIT.append(PIT_Entry(previous_node, packet.name, 0)) #record in PIT
+				node.PIT.append(PIT_Entry(packet.name, 0, previous_node)) #record in PIT
 				node.PIT_lock.release()
 				# Using longest prefix matching, figure out where to go next
 				counter = []
@@ -763,19 +825,22 @@ def service_connection(packet, node, previous_node):
 			else:
 				if logging:
 					print("Node " + str(node.number) + " is sending data to Node " + str(next_node[x]))
-				send_packet(ip, port+node.number, port+next_node[x]+num_nodes, new_packets[x])
+				send_packet(ip, port+node.number, port+next_node[x]+num_nodes, new_packets[x], ret_Fail, failure_range, failure_dist)
 
 
 #-------------------------------------------------------------------------------
 # argparse
 def readargs():
-	global topfile, weightdist, pktgen_num, timeout, phone_node_connect_order, trans_range_dist
-	global velocity, delta, phone_test, iperf_test, logging, metrics_outfile, linger_dist
+	global logging
 
 	p = argparse.ArgumentParser(description = "Mobile Consumer NDN simulator")
+		
+	p.add_argument("-o", "--outfile", type = str, default = 'metric_outfile.csv',
+		help = "Output file for simulation metrics. Appended to if exists already, creates if not.")
 	 
 	p.add_argument("-tp", "--topfile", type = str, default = 'topology.txt',
 		help = "The file to read in the topology of the NDN system.")
+		
 	p.add_argument("-w", "--weights", type = str, default = 'uniform:0, 1',
 		help = "distribution:distrubution values\n\
 		The lambda_ values (aka transmission rates) for each link in the topology \n\
@@ -783,38 +848,23 @@ def readargs():
 		The default, \"uniform:0, 1\" means that each link has a transmission rate \n\
 		chosen by the uniform probability distrobution between 0-1")
 		
-	#p.add_argument("-wp", "--weightfile", type = str, default = 'weights.txt',
-	#	help = "The file to read in the weights of the NDN topology. Should be the same shape as topfile")
-		
-	p.add_argument("-pgn", "--pktgen_num", type = int, default = 5,
-		help = "When generating dummy data, determines how many data packets to generate.\n\
-		Default is 5 packets.")
-		
-	p.add_argument("-to", "--timeout", type = float, default = 5,
-		help = "Deadline to resend for packets if you dont receive in timeout amount of seconds\n \
-		timeout scenario: data packet is dropped before delta/linger has expired,\n \
-		we want to resend so we might be able to get the data before delta/linger expires.\n\
-		Default is 5 seconds.\
-		")
-		
-		
-	p.add_argument("-l", "--linger", type = str, default = "uniform:0, 0.5",
-		help = "\"distribution:distrubution values\"\n\
-		The probability distribution for MC's linger time at each gateway connection.\n\
-		Eg, the default: \"uniform:0, 0.5\" means that at each node the mobile consumer is connecting to,\n\
-		they are in range of that node for x seconds as determined by the uniform probability distribution between 0 and 0.5.")
-		
 	p.add_argument("-r", "--range", type = str, default = "uniform:0, 2",
 		help = "\"distribution:distrubution values\"\n\
 		The probability distribution of each node's transmission range.\n\
 		Eg, the default: \"uniform:0, 2\" means that each node's transmission range is\n\
 		determined by the uniform probability distribution between 0 and 2.")
+					
+	p.add_argument("-fd", "--failure_dist", type = str, default = "uniform:1, 1",
+		help = "\"distribution:distrubution values\"\n\
+		The probability distribution for the probability that a packet will fail when sent to the next node.\n\
+		Eg, the default: \"uniform:0, 0.5\" means that every time a packet is being sent to another node,\n\
+		the possibility of it being sent is determined by the uniform probability distribution between 0 and 0.5.")		
 		
-	p.add_argument("-v", "--velocity", type = str, default = "uniform:0, 2",
-		help = "\"number_to_gen:distribution:distrubution values\"\n\
-		The probability distribution of MC's velocity at each gateway connection.\n\
-		Eg, the default: \"uniform:0, 2\" means that at each node the mobile consumer is connecting to,\
-		they are travelling at a speed chosen by the uniform probability distribution between 0 and 2.")
+	p.add_argument("-fr", "--failure_range", type = str, default = "0, 0.01",
+		help = "\"lower bounds, upper bounds\"\n\
+		The percentage (from x to y) for the probability that a packet will fail when sent to the next node.\n\
+		Eg, \"[0.1, 0.5]\" means that every time a packet is being sent to another node,\n\
+		the possibility of it failing to be sent is between 10% and 50%.")
 		
 	p.add_argument("-pnco", "--phone_node_connect_order", type = str, default = "3:uniform:0, 8",
 		help = "\"distribution:distrubution values\"\n\
@@ -823,48 +873,75 @@ def readargs():
 		Eg, the default: \"3:uniform:0, 8\" means that the phone will select the next node \
 		to travel to by using the uniform probability distirbution between 0-8. It selects 3 times")
 		
+	p.add_argument("-v", "--velocity", type = str, default = "uniform:0, 2",
+		help = "\"number_to_gen:distribution:distrubution values\"\n\
+		The probability distribution of MC's velocity at each gateway connection.\n\
+		Eg, the default: \"uniform:0, 2\" means that at each node the mobile consumer is connecting to,\
+		they are travelling at a speed chosen by the uniform probability distribution between 0 and 2.")
+		
+	p.add_argument("-pgn", "--pktgen_num", type = int, default = 5,
+		help = "When generating dummy data, determines how many data packets to generate.\n\
+		Default is 5 packets.")
+		
+	p.add_argument("-pd", "--precache_dist", type = str, default = "uniform:0, 0.01",
+		help = "\"distribution:distrubution values\"\n\
+		The probability distribution for determining whether a packet will be precached \n\
+		through the topology or through the infrastructure.\n\
+		Eg, \"uniform:0, 0.5\" means that if the probability of link failure on the link path\n\
+		from the current location to the destination node (based on the link failure distribution)\n\
+		is greater than a value between 0.0 and 0.5 (chosen by the uniform distribution), then the packet\n\
+		will be delivered through the infrastructure instead of the topology.")
+		
+	p.add_argument("-l", "--linger", type = str, default = "uniform:0, 0.5",
+		help = "\"distribution:distrubution values\"\n\
+		The probability distribution for MC's linger time at each gateway connection.\n\
+		Eg, the default: \"uniform:0, 0.5\" means that at each node the mobile consumer is connecting to,\n\
+		they are in range of that node for x seconds as determined by the uniform probability distribution between 0 and 0.5.")		
+		
 	p.add_argument("-d", "--delta", type = str, default = "3:uniform:0, 0.5",
 		help = "\"number_to_gen:distribution:distrubution values\"\n\
 		The probability distribution of deadline in seconds before the data expires.\n\
 		Eg, the default: \"3:uniform:0, 0.5\" means that the data packet must be received by the MC before \
 		the amount of seconds selected by the uniform probability distribution, between 0-0.5, \
 		before the MC moves and the interest is re-sent. This happens again 2 more times.")
+				
+	p.add_argument("-to", "--timeout", type = float, default = 5,
+		help = "Deadline to resend for packets if you dont receive in timeout amount of seconds\n \
+		timeout scenario: data packet is dropped before delta/linger has expired,\n \
+		we want to resend so we might be able to get the data before delta/linger expires.\n\
+		Default is 5 seconds.\
+		")
+		
+	p.add_argument("-log", "--logging", type = str, default = False,
+		help = "Toggle to determine whether all logging information will be printed. Default is False.")
 		
 	p.add_argument("-pt", "--phone_test", type = str, default = False,
 		help = "Toggle to determine whether the simulation will connect to the Android Phone \
 		to receive the initial interest packet and send final data. Default is False.")
+		
 	p.add_argument("-ipt", "--iperf_test", type = str, default = False,
 		help = "Toggle to determine whether the simulation will generate dummy data or generate \
 		data via iperf3. Default is False.")
-	p.add_argument("-log", "--logging", type = str, default = False,
-		help = "Toggle to determine whether all logging information will be printed. Default is False.")
-	 
-	p.add_argument("-o", "--outfile", type = str, default = 'metric_outfile.csv',
-		help = "Output file for simulation metrics. Appended to if exists already, creates if not.")
-		
-		
-	#"--whatever "number_to_gen:distribution:distrubution values"	
-		
+
 	args = p.parse_args()
 	
 	if not (os.path.isfile(args.topfile)):
 		print("Specified topfile", args.topfile ,"does not exist")
 		exit()
-		
-	metrics_outfile = args.outfile
-	topfile = args.topfile
-	pktgen_num = args.pktgen_num
-	timeout = args.timeout
 	
 	# values generated later
 	weightdist = args.weights.split(":")
-	#weightfile = args.weightfile
 	linger_dist = args.linger.split(":")
 	trans_range_dist = args.range.split(":")
 	
+	# link failure distribution and probability threshold
+	failure_dist = args.failure_dist.split(":")
+	failure_range = args.failure_range
+	precache_dist = args.precache_dist.split(":")
+	
 	# generate phone node connect order 
 	phone_node_connect_order = split_dist_string (args.phone_node_connect_order)
-	f = open(topfile, 'r')
+	f = open(args.topfile, 'r')
 	data = f.read().split("\n")
 	nodemax = len(data)-2
 	f.close()
@@ -872,12 +949,12 @@ def readargs():
 	
 	# generate velocity values
 	velocity = split_dist_string (str(len(phone_node_connect_order))+":"+args.velocity)
-	
-		
+			
 	# generate deltas 
 	delta = split_dist_string (args.delta)
 	
-	
+	phone_test = True
+	iperf_test = True
 	if (args.phone_test in ["True", "true", "t", "T", "1", "on"]):
 		phone_test = True
 	else:
@@ -889,82 +966,83 @@ def readargs():
 	if (args.logging in ["True", "true", "t", "T", "1", "on"]):
 		logging = True
 	else:
-		logging = False
+		logging = False		
 		
 	print("---")
-	print("CLI: python3 NDNsim.py -tp \"" +args.topfile+ \
+	print("CLI: python3 NDNsim.py "+ \
+	"-o \""+args.outfile+ \
+	# for the topology
+	"\" -tp \"" +args.topfile+ \
 	"\" -w \"" +args.weights+ \
-	"\" -pgn \"" +str(args.pktgen_num)+ \
-	"\" -to \"" +str(args.timeout)+  \
-	"\" -l \"" +args.linger+ \
 	"\" -r \"" +args.range+ \
-	"\" -v \"" +args.velocity+ \
+	"\" -fd \""+args.failure_dist+ \
+	"\" -fr \""+args.failure_range+	\
+	# mobile consumer / caching info
 	"\" -pnco \"" +args.phone_node_connect_order+\
+	"\" -v \"" +args.velocity+ \
+	"\" -pgn \"" +str(args.pktgen_num)+ \
+	"\" -pd \""+args.precache_dist+ \
+	# timeouts/deadlines
+	"\" -l \"" +args.linger+ \
 	"\" -d \"" +args.delta+ \
-	"\" -pt \"" +str(args.phone_test)+ \
-	"\" -ipt \"" +str(args.iperf_test)+ \
+	"\" -to \"" +str(args.timeout)+  \
+	#toggles
 	"\" -log \"" +str(args.logging)+ \
-	"\" -o \""+args.outfile+"\"\n")
+	"\" -pt \"" +str(args.phone_test)+ \
+	"\" -ipt \"" +str(args.iperf_test)+ "\"\n")
 	
-	print("distributions: ")
-	print("weightdist:", weightdist)
-	print("linger_dist:", linger_dist)
-	print("trans_range_dist:", trans_range_dist)
-	print("velocity:", velocity)
-	print("phone_node_connect_order:", phone_node_connect_order)
-	print("delta:", delta)
-	return args
-
-#-------------------------------------------------------------------------------
-# argparse helper
-def split_dist_string(dist_string):
-	retval = []
-	temp = dist_string.split(":")
-	number_to_gen = int(temp[0])
-	pdist = temp[1]
-	pdist_params = list(map(float, temp[2].split(", ")))
-	for i in range(number_to_gen):
-		retval.append(distribution_helper(pdist, pdist_params))	
-	return retval
+	if logging:
+		print("-- DISTRIBUTIONS --")
+		print("weightdist:", weightdist)
+		print("trans_range_dist:", trans_range_dist)
+		print("phone_node_connect_order:", phone_node_connect_order)
+		print("velocity:", velocity)
+		print("linger_dist:", linger_dist)
+		print("delta:", delta)
+		#note: failure distribution, failure range, and precache dist are rerolled at the moment.
+	return args, args.topfile, weightdist, args.outfile, args.pktgen_num, args.timeout, velocity, delta, linger_dist, trans_range_dist, precache_dist, failure_range, failure_dist, phone_test, iperf_test, phone_node_connect_order
 
 #-------------------------------------------------------------------------------
 # MAIN
 if __name__ == "__main__":
 
-	args = readargs()
+	args, topfile, weightdist, metrics_outfile, pktgen_num, timeout, velocity, delta, linger_dist, trans_range_dist, precache_dist, failure_range, failure_dist, phone_test, iperf_test, phone_node_connect_order = readargs()
+	
+	client = ""
 	
 	# starts iperf3 server if needed
 	if iperf_test:
 		server = subprocess.Popen(['iperf3', '-s'])
 		client = subprocess.run(['iperf3', '-c', 'localhost'], stdout=subprocess.PIPE)
+		client = client.stdout.decode("utf-8")
 		# closes iperf3 server 
 		server.terminate()
 		server.wait()
-	
+		
 	# -----
 	# Read in topology & start threads for each node
 	# each thread has a node listening, then when packet is received, node threads to service it
-	topology = Topology(topfile)
+	topology = Topology(topfile, weightdist, trans_range_dist)
 	global_topology = topology
 	num_nodes = len(topology.nodes)
 	thread_list = []
 	for x in range(len(topology.nodes)):
 		# port + num_nodes: differentiate between current and sending node
 		topology.nodes[x].port = topology.nodes[x].port + num_nodes 
-		t1 = Thread(target=socket_code, args=[topology.nodes[x]])
+		t1 = Thread(target=socket_code, args=[topology.nodes[x], pktgen_num, precache_dist, client, failure_range, failure_dist, iperf_test, phone_node_connect_order, num_nodes])
 		t1.start()
 		thread_list.append(t1)
 	
 	# -----
 	# Tests nodes 
-	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'test', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False, -1))
+	send_packet(ip, port-1, port+num_nodes, Packet(Hybrid_Name("", "", "", 'test', ""), time.time(), 0, 0, -1, -1, -1, -1, "", -1, -1, False, -1), False, failure_range, failure_dist)
 	
 	# waits until all nodes are online
 	while node_init != 1:
 		pass
 
+	print("\n-- SIMULATION START--")
 	print("All nodes online")
-	
 	# -----
 	# Connect to server on phone
 	if phone_test:
@@ -979,7 +1057,7 @@ if __name__ == "__main__":
 		except Exception as e:
 			print("Failed to connect to server")
 			print(e)
-			close_threads(thread_list)
+			close_threads(thread_list, failure_range, failure_dist)
 			exit()
 			
 	# If not connecting to phone, use this as interest
@@ -1001,8 +1079,8 @@ if __name__ == "__main__":
 	# NDN Gauntlet
 	timeout_time = []
 	timestamp = [] 
+	linger = []
 
-	#global phone_node_connect_order
 	counter_x = 0
 	counter_delta = 0
 	timeout_counter = 0 
@@ -1046,17 +1124,19 @@ if __name__ == "__main__":
 		timeout_check = False
 		temp_final_data = []
 		if temp_linger_flag == False: # calculate linger time
-			alpha = calc_linger(topology.nodes[phone_node].transmission_range, velocity[counter_x])
+			alpha = calc_linger(topology.nodes[phone_node].transmission_range, velocity[counter_x], linger_dist)
+			linger.append(alpha)
 		else: # use updated linger time (resend occurred)
 			alpha = temp_alpha
 			temp_linger_flag = False
+		
 		curr_time = time.time()
 		end_time = curr_time + delta[counter_delta]
 		end_time_1 = curr_time + timeout 
 		end_time_2 = curr_time + alpha 
 		
 		# Sends interest packet from dummy node (-1) to access point (phone node)
-		send_packet(ip, port-1, port+phone_node+num_nodes, Packet(h_name, curr_time, 0, 0, alpha, delta[counter_delta], velocity[counter_x], -1, "", 0.0001, -1, False, len(final_data)-1))	
+		send_packet(ip, port-1, port+phone_node+num_nodes, Packet(h_name, curr_time, 0, 0, alpha, delta[counter_delta], velocity[counter_x], -1, "", 0.0001, -1, False, len(final_data)-1), True, failure_range, failure_dist)	
 		
 		# loop until we reach delta, linger, or timeout (end time)
 		while ((curr_time <= end_time) and (curr_time <= end_time_1) and (curr_time <= end_time_2)):
@@ -1147,12 +1227,7 @@ if __name__ == "__main__":
 			# -----
 			# Send the data packet to the phone
 			if phone_test:
-				# iperf data is bytestream
-				if iperf_test:
-					phone_client.send((sorted_final_data[x].payload))
-				else:
-					phone_client.send((sorted_final_data[x].payload).encode('utf-8'))
-				time.sleep(3)
+				phone_client.send((sorted_final_data[x].payload).encode('utf-8'))
 		print("")
 		
 		
@@ -1188,7 +1263,7 @@ if __name__ == "__main__":
 			break
 	
 	print("Taking nodes offline!")
-	close_threads(thread_list)
+	close_threads(thread_list, failure_range, failure_dist)
 	
 	# -----
 	#Metrics
@@ -1223,7 +1298,11 @@ if __name__ == "__main__":
 		counter = counter + 1
 	if len(timeout_time) != len(final_data):
 		print("Interest " + str(counter) + " had 0/" + str(len(final_data[counter])) + " packets drop")
-	print("Percentage of dropped packets: " + str(dropped_counter/total_data_counter*100) + "%")
+	if(total_data_counter>0):
+		print("Percentage of dropped packets: " + str(dropped_counter/total_data_counter*100) + "%")
+	else:
+		total_data_counter = 1
+		print("Percentage of dropped packets: " + str(dropped_counter/total_data_counter*100) + "%")
 	print("--- END ---\n")
 	
 	f = ""
@@ -1232,36 +1311,51 @@ if __name__ == "__main__":
 	else: #if the file doesnt exist, create a new one and add the header
 		f = open(metrics_outfile, 'w')
 		f.write("Topfile, \
-weightdist, \
-Pktgen_num, \
-Timeout, \
-Linger_dist, \
-Linger, \
+Weightdist, \
 Range_dist, \
-Velocity_dist,\
-Velocity, \
+Failure_dist, \
+Failure_range, \
 Phone_node_connect_order_dist, \
 Phone_node_connect_order, \
+Velocity_dist,\
+Velocity, \
+Pktgen_num, \
+Precache_dist, \
+Linger_dist, \
+Linger, \
 Delta_dist, \
 Delta, \
+Timeout, \
 Phone_test, iperf_test, \
 End-To-End Delay, Total Number of Timeouts, Number of Linger Time Timeouts, Number of Delta Timeouts, Number of Internal Timeouts, Percent of dropped packets, Success?, Cache Hit?, Number of Cache Hits, Number of Times Precached\n")
 	
+	
 	f.write("\""+args.topfile+\
 	 "\", \"" +args.weights+\
-	  "\", \"" +str(args.pktgen_num)+\
-	   "\", \"" +str(args.timeout)+\
-	   "\", \"" +str(args.linger)+\
-	   "\", \"" +str(linger)+\
-	   "\", \"" +str(args.range)+\
-	 "\", \"" +args.velocity+\
-	  "\", \"" +str(velocity)+\
+	 "\", \"" +str(args.range)+\
+	 "\", \"" +str(args.failure_dist)+\
+	 "\", \"" +str(args.failure_range)+\
 	 "\", \"" +args.phone_node_connect_order+\
-	  "\", \"" +str(phone_node_connect_order)+\
+	 "\", \"" +str(phone_node_connect_order)+\
+	 "\", \"" +args.velocity+\
+	 "\", \"" +str(velocity)+\
+	 "\", \"" +str(args.pktgen_num)+\
+	 "\", \"" +str(args.linger)+\
+	 "\", \"" +str(linger)+\
 	 "\", \"" +args.delta+ "\", \"" +str(delta)+\
-	 "\", \"" +str(args.phone_test)+ "\", \"" +str(args.iperf_test)+ "\", "+\
-	
-	str(total_delay) + ", " + str(timeout_counter) + ", " + str(alphaout_counter) + ", " + str(delta_timeout_counter) + ", " + str(internal_timeout_counter) + ", " + str(dropped_counter/total_data_counter*100) + ", " + str(rec_data) + ", " + str(precache_check) + ", " + str(num_cache_hit) + ", " + str(num_precache) + "\n") 
+	 "\", \"" +str(args.timeout)+\
+	 "\", \"" +str(args.phone_test)+ \
+	 "\", \"" +str(args.iperf_test)+ \
+	 "\", "+ str(total_delay) + ", " + \
+	 str(timeout_counter) + ", " + \
+	 str(alphaout_counter) + ", " + \
+	 str(delta_timeout_counter) + ", " + \
+	 str(internal_timeout_counter) + ", " + \
+	 str(dropped_counter/total_data_counter*100) + ", " + \
+	 str(rec_data) + ", " + \
+	 str(precache_check) + ", " + \
+	 str(num_cache_hit) + ", " + \
+	 str(num_precache) + "\n") 
 	
 	f.close()
 	os._exit(0)
