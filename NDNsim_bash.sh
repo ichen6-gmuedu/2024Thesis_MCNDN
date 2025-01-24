@@ -1,13 +1,10 @@
 #!/bin/bash
 
-# python3 NDNsim.py -tp "${TOPFILE[$i]}" -wp "${WEIGHTDIST[$i]}" -pgn "${PLTGEN_NUM[$i]}" -to "${TIMEOUT[$i]}" -pnco "${PHONE_NODE_CONNECT_ORDER[$i]}" -v "${VELOCITY[$i]}" -d "${DELTA[$i]}" -pt "${PHONE_TEST[$i]}" -ipt "${IPERF_TEST[$i]}" -l "$LOGGING"
-
-python3 NDNsim.py -o "metric_outfile.csv" -tp "topology.txt" -w "uniform:0, 1" -r "uniform:0, 2" -fd "uniform:0, 0.5" -fr "0, 0.5" -pnco "3:uniform:0, 8" -v "uniform:0, 2" -pgn "5" -pd "uniform:0, 0.5" -l "uniform:0, 0.5" -d "3:uniform:0, 0.5" -to "5" -log "False" -pt "False" -ipt "False"
-
+# python3 NDNsim.py -o "metric_outfile.csv" -tp "topology.txt" -w "uniform:0, 1" -r "uniform:0, 2" -fd "uniform:0, 0.5" -fr "0, 0.5" -pnco "3:uniform:0, 8" -v "uniform:0, 2" -pgn "5" -pd "uniform:0, 0.5" -l "uniform:0, 0.5" -d "3:uniform:0, 0.5" -to "5" -log "False" -pt "False" -ipt "False"
+# python3 NDNsim.py -o "${METRICFILE[$i]}" -tp "${TOPFILE[$i]}" -w "${WEIGHTDIST[$i]}" -r "${RANGE[$i]}" -fd "${FAILDIST[$i]}" -fr "${FAILRANGE[$i]}" -pnco "${PHONE_NODE_CONNECT_ORDER[$i]}" -v "${VELOCITY[$i]}" -pgn "{$PLTGEN_NUM[$i]}" -pd "${PRECACHEDIST[$i]}" -l "${LINGER[$i]}" -d "${DELTA[$i]}" -to "${TIMEOUT[$i]}" -log "${LOGGING[$i]}" -pt "${PHONE_TEST[$i]}" -ipt "${IPERF_TEST[$i]}"
 
 METRICFILE=("metric_outfile.csv")
 rm $METRICFILE
-
 
 echo "--------------------TESTING DEFAULT 5 times--------------------"
 TOPFILE=("topology.txt")

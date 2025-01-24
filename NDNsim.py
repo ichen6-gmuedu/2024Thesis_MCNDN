@@ -20,15 +20,14 @@ phone_ip =  '192.168.1.207' #'localhost' #'192.168.1.1'
 phone_port = 9095
 
 # Globals
-phone_node_connect_order_counter = 0 # index for mobile consumer location
 global_topology = [] #for dijkstras
 logging = True
 
 #Locks
+phone_node_connect_order_counter = 0 # index for mobile consumer location
+phone_node_connect_order_counter_lock = Lock() #lock for phone_node_connect_order_counter
 node_init = 0 #0 if nodes are not setup, 1 if nodes are setup
 node_init_lock = Lock() #lock for updateing the node init
-phone_node = -1 #the number of the node that the phone is currently connected to
-phone_node_lock = Lock() #lock for updating the phone node
 final_data = [] #so we can pull the data from a thread
 final_data_lock = Lock() #lock for updating the data
 print_lock = Lock() #lock for updating the data
@@ -381,35 +380,35 @@ def distribution_helper(distribution: str, values: list, cdf: bool) -> float:
 
 #-------------------------------------------------------------------------------
 # generate packets
-# returns a list of packets and where to send them
-def generate_packets(packet: Packet, pktgen_num: int, client: str, iperf_test: bool):
+# returns a list of packets and their total size
+def generate_packets(packet: Packet, pktgen_num: int, string: str) -> (list, int):
 	new_packets = []
 	total_size = 0
 	
 	# if using iperf to generate data_name, run iperf subprocess
 	# CHANGED: simply fetch data rather than generate
-	if iperf_test:
+	if string != "":
 		# chop up iperf results into pkSize and append
 		pkSize = 256 #1024 doesn't work because of unpickling error
-		total_size = len(client)
-		for i in range(0,len(client), pkSize):
+		total_size = len(string)
+		for i in range(0, len(string), pkSize):
 			temp_packet = deepcopy(packet)
-			temp_packet.name.data_hash = hash(client)
-			if(i+pkSize >= len(client)):
-				temp_packet.payload = client[i:len(client)]
+			if temp_packet.name != None:
+				temp_packet.name.data_hash = str(hash(string)) ##TODO - is this a hash of the payload or the entire string?
+			if(i+pkSize >= len(string)):
+				temp_packet.payload = string[i:len(string)]
 			else:
-				temp_packet.payload = client[i:i+pkSize]
-			temp_packet.total_size = len(client)
+				temp_packet.payload = string[i:i+pkSize]
 			new_packets.append(temp_packet)
 			
 	# if testing dummy data, new packets are just str of number
 	else:
-		total_size = pktgen_num
 		for x in range(pktgen_num):
 			temp_packet = deepcopy(packet)
-			temp_packet.name.data_hash = hash(pktgen_num)
+			if temp_packet.name != None:
+				temp_packet.name.data_hash = str(hash(str(x)))
 			temp_packet.payload = str(x)
-			temp_packet.total_size = pktgen_num
+			total_size = total_size + len(str(x))
 			new_packets.append(temp_packet)
 	
 	# set all packets' total_packets for PIT entry
@@ -417,35 +416,72 @@ def generate_packets(packet: Packet, pktgen_num: int, client: str, iperf_test: b
 	for x in range(len(new_packets)):
 		new_packets[x].total_packets = len(new_packets)
 		new_packets[x].counter = x
+		new_packets[x].total_size = total_size
 	return new_packets, total_size
 	
 #-------------------------------------------------------------------------------
 # Next Gateway
 # determines where we are going next
 # returns destination gateway ID
-def next_gateway(current_node, velocity, phone_node_connect_order):
+def next_gateway(current_node: Node, velocity: float, phone_node_connect_order: list) -> int:
 	global phone_node_connect_order_counter
 	ret_value = 0
+	phone_node_connect_order_counter_lock.acquire()
+	phone_node_connect_order_counter += 1
+	phone_node_connect_order_counter_lock.release()
 	try:
-		phone_node_connect_order_counter += 1
 		ret_value = phone_node_connect_order[phone_node_connect_order_counter]
-		return ret_value
 	except:
-		return -1
+		ret_value = -1
 	return ret_value	
 	
 #-------------------------------------------------------------------------------
 # Calculates the linger time 
-def calc_linger(transmission_range, velocity, linger_dist):
+def calc_linger(transmission_range: float, velocity: float, linger_dist: list) -> float:
 	pdist = linger_dist[0]
-	pdist_params = list(map(float, linger_dist[1].split(", ")))
+	pdist_params = []
+	try:
+		pdist_params = list(map(float, linger_dist[1].split(", ")))
+	except:
+		print("Error! Value(s) in: " + linger_dist[1] + " must be numbers")
+		exit(1)
 	return distribution_helper(pdist, pdist_params, False)
+	
+#-------------------------------------------------------------------------------
+# argparse helper
+# ex: "3:uniform:0, 8" generates 3 values using a uniform distribution with 0 and 8
+def split_dist_string(dist_string: str) -> list:
+	retval = []
+	temp = dist_string.split(":")
+	if len(temp) != 3:
+		print("Error! Problem formatting string: " + dist_string)
+		exit(1)
+	
+	number_to_gen = 0
+	try:
+		number_to_gen = int(temp[0])
+	except:
+		print("Error! First value in string: " + dist_string + " must be an int")
+		exit(1)
+		
+	pdist = temp[1]
+	pdist_params = []
+	try:
+		pdist_params = list(map(float, temp[2].split(", ")))
+	except:
+		print("Error! Value(s) in: " + temp[2] + " must be numbers")
+		exit(1)
+		
+	for i in range(number_to_gen):
+		retval.append(distribution_helper(pdist, pdist_params, False))	
+	return retval
 	
 #-------------------------------------------------------------------------------
 # dijkstras
 # Finds shortest path from x to y
+# only based on the 'weights' field of topology
 # returns the shortest path, its weight, and the next hop.
-def dijkstras(x, y, topology):
+def dijkstras(x: int, y: int, topology: Topology) -> (list, float, int):
 	ret_value = 0
 	if x == y: #if we are already at the end
 		return [x, x], 0, x
@@ -488,18 +524,6 @@ def dijkstras(x, y, topology):
 			ret_route = viable_routes[a]
 	
 	return ret_route, smallest_val, ret_route[1]
-
-#-------------------------------------------------------------------------------
-# argparse helper
-def split_dist_string(dist_string):
-	retval = []
-	temp = dist_string.split(":")
-	number_to_gen = int(temp[0])
-	pdist = temp[1]
-	pdist_params = list(map(float, temp[2].split(", ")))
-	for i in range(number_to_gen):
-		retval.append(distribution_helper(pdist, pdist_params, False))	
-	return retval
 	
 #-------------------------------------------------------------------------------
 # does the precaching		
@@ -590,7 +614,7 @@ def close_threads(thread_list, failure_range, failure_dist):
 # Given a node, open server sockets to listen for connections
 # When packet is received, close socket and Thread to process the packet
 # When 'close' is receieved, shutdown the socket and child threads
-def socket_code(node, pktgen_num, precache_dist, client, failure_range, failure_dist, iperf_test, phone_node_connect_order, num_nodes):
+def socket_code(node, pktgen_num, precache_dist, client, failure_range, failure_dist, phone_node_connect_order, num_nodes):
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # allows us to reuse socket for next run
 		s.bind((node.IP, node.port))
@@ -609,7 +633,7 @@ def socket_code(node, pktgen_num, precache_dist, client, failure_range, failure_
 				print("Node " + str(node.number) + " received data from Node " + str(addr[1]-port))
 				
 			# thread to process the packet (Cache, PIT, FIB stuff)
-			t1 = Thread(target=service_connection, args=[packet, node, addr[1]-port, pktgen_num, precache_dist, client, failure_range, failure_dist, iperf_test, phone_node_connect_order, num_nodes])
+			t1 = Thread(target=service_connection, args=[packet, node, addr[1]-port, pktgen_num, precache_dist, client, failure_range, failure_dist, phone_node_connect_order, num_nodes])
 			t1.start()
 			
 			# Closes child threads if we're done
@@ -622,7 +646,7 @@ def socket_code(node, pktgen_num, precache_dist, client, failure_range, failure_
 #-------------------------------------------------------------------------------
 # Service connection
 # When a packet has been receivd at a node, we process it
-def service_connection(packet, node, previous_node, pktgen_num, precache_dist, client, failure_range, failure_dist, iperf_test, phone_node_connect_order, num_nodes):
+def service_connection(packet, node, previous_node, pktgen_num, precache_dist, client, failure_range, failure_dist, phone_node_connect_order, num_nodes):
 	global node_init, final_data, logging, num_cache_hit, num_precache
 	ret_Fail = True
 	
@@ -697,7 +721,7 @@ def service_connection(packet, node, previous_node, pktgen_num, precache_dist, c
 			else: # Not a cache hit, append node's data as payload in packet and add data_hash to data_name
 				if logging:
 					print("Reached Producer")
-				new_packets, total_size = generate_packets(packet, pktgen_num, client, iperf_test) # generates data packets to be sent
+				new_packets, total_size = generate_packets(packet, pktgen_num, client) # generates data packets to be sent
 				for x in range(len(new_packets)):
 					next_node.append(previous_node) #always send back 
 
@@ -827,7 +851,6 @@ def service_connection(packet, node, previous_node, pktgen_num, precache_dist, c
 					print("Node " + str(node.number) + " is sending data to Node " + str(next_node[x]))
 				send_packet(ip, port+node.number, port+next_node[x]+num_nodes, new_packets[x], ret_Fail, failure_range, failure_dist)
 
-
 #-------------------------------------------------------------------------------
 # argparse
 def readargs():
@@ -857,24 +880,24 @@ def readargs():
 	p.add_argument("-fd", "--failure_dist", type = str, default = "uniform:1, 1",
 		help = "\"distribution:distrubution values\"\n\
 		The probability distribution for the probability that a packet will fail when sent to the next node.\n\
-		Eg, the default: \"uniform:0, 0.5\" means that every time a packet is being sent to another node,\n\
+		Eg: \"uniform:0, 0.5\" means that every time a packet is being sent to another node,\n\
 		the possibility of it being sent is determined by the uniform probability distribution between 0 and 0.5.")		
 		
 	p.add_argument("-fr", "--failure_range", type = str, default = "0, 0.01",
 		help = "\"lower bounds, upper bounds\"\n\
 		The percentage (from x to y) for the probability that a packet will fail when sent to the next node.\n\
-		Eg, \"[0.1, 0.5]\" means that every time a packet is being sent to another node,\n\
+		Eg, \"0.1, 0.5\" means that every time a packet is being sent to another node,\n\
 		the possibility of it failing to be sent is between 10% and 50%.")
 		
 	p.add_argument("-pnco", "--phone_node_connect_order", type = str, default = "3:uniform:0, 8",
-		help = "\"distribution:distrubution values\"\n\
+		help = "\"amount_to_gen:distribution:distrubution values\"\n\
 		The probability distribution for the pattern in which the mobile consumer\n\
 		will disconnect and re-connect to nodes in the topology.\n \
 		Eg, the default: \"3:uniform:0, 8\" means that the phone will select the next node \
 		to travel to by using the uniform probability distirbution between 0-8. It selects 3 times")
 		
 	p.add_argument("-v", "--velocity", type = str, default = "uniform:0, 2",
-		help = "\"number_to_gen:distribution:distrubution values\"\n\
+		help = "\"distribution:distrubution values\"\n\
 		The probability distribution of MC's velocity at each gateway connection.\n\
 		Eg, the default: \"uniform:0, 2\" means that at each node the mobile consumer is connecting to,\
 		they are travelling at a speed chosen by the uniform probability distribution between 0 and 2.")
@@ -1029,7 +1052,7 @@ if __name__ == "__main__":
 	for x in range(len(topology.nodes)):
 		# port + num_nodes: differentiate between current and sending node
 		topology.nodes[x].port = topology.nodes[x].port + num_nodes 
-		t1 = Thread(target=socket_code, args=[topology.nodes[x], pktgen_num, precache_dist, client, failure_range, failure_dist, iperf_test, phone_node_connect_order, num_nodes])
+		t1 = Thread(target=socket_code, args=[topology.nodes[x], pktgen_num, precache_dist, client, failure_range, failure_dist, phone_node_connect_order, num_nodes])
 		t1.start()
 		thread_list.append(t1)
 	
@@ -1094,12 +1117,11 @@ if __name__ == "__main__":
 	
 	# Sends interest packets until data is received or timeout occurs.
 	while True:
-		phone_node_lock.acquire()
+		phone_node = 0
 		try:
 			phone_node = phone_node_connect_order[counter_x]
 		except: # connect to the last access point repeatedly
 			phone_node = phone_node_connect_order[-1]
-		phone_node_lock.release()
 		
 		# increment the number of interest packets out there
 		total_packet_counter_lock.acquire()

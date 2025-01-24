@@ -3,14 +3,15 @@
 ## Contents
  - Project Description
  - Installation
- 	- Python Installation
- 	- iperf3 Installation
- 	- Android SDK Installation
-   - Android Application Configuration
+   - Python Installation
+   - iperf3 Installation
+   - Android SDK Installation
+     - Android Application Configuration
  - Running
- 	- Command Line Inputs
+   - Command Line Inputs
   - Configuring NDNsim For Android Device
- 	- Configuring bash script
+   - Configuring bash script
+ - Expected Results
 
 ## Project Description
 
@@ -30,14 +31,6 @@ sudo apt-get update
 sudo apt-get install python3.10.12
 ```
 
-### Android SDK Installation
-
-Installation instructions: https://stackoverflow.com/questions/34556884/how-to-install-android-sdk-on-ubuntu
-Install latest version: 
-```sudo apt install android-sdk```
-
-The version used for this simulation is Studio Koala Feature Drop | 2024.1.2 which is available android SDK website https://developer.android.com/studio/archive
-
 ### Iperf3 Installation
 
 Iperf3 is utilized for data generation and it is not necessarily required if simulator is not run with iperf3 toggled on. 
@@ -47,18 +40,42 @@ Install iperf3 via the iperf3 website. https://iperf.fr/iperf-download.php
 sudo apt-get install iperf3
 ```
 
+### Android SDK Installation
+
+Installation instructions: https://stackoverflow.com/questions/34556884/how-to-install-android-sdk-on-ubuntu
+Official installation instructions: https://developer.android.com/studio/install
+
+Install latest version: 
+```
+sudo apt install android-sdk
+```
+
+The version used for this simulation is Studio Koala Feature Drop | 2024.1.2 which is available on the Android SDK website https://developer.android.com/studio/archive
+
 
 #### Android Application Configuration
 
-After installation, select start a new project. This can be done under the file tab on the upper right, or it should be immediately recommended once it is installed.
+After installation, run Android SDK by either clicking on the application or navigating to the `android-studio/bin/` and executing `./studio.sh`
 
-Next, select a "Phone and Tablet" template that supports Java. This simulation uses "Empty Views Activity" template. Select the template, and then select "Java" in the language dropdown menu. Rename the project to "phone". 
+Select start a new project. This can be done under the file tab on the upper right, or it should be immediately recommended once it is installed.
+
+![config1](/readme_images/AndroidAppConfig_1.png "new project")
+
+Next, select a "Phone and Tablet" template that supports Java. This simulation uses "Empty Views Activity" template. 
+
+![config2](/readme_images/AndroidAppConfig_2.png "Empty Views Activity")
+
+Select the template, and then select "Java" in the language dropdown menu. Rename the project to "phone". Click the Finish Button.
+
+![config3](/readme_images/AndroidAppConfig_3.png "project phone")
 
 Next, replace the contents of `app/res/layout/activity_main.xml` , `app/java/com.example/phone/MainActivity.java` , and `app/manifests/AndroidManifest.xml` in the Android SDK project files with the corresponding three files in this repo: `activity_main.xml`, `MainActivity.java`, `AndroidManifest.xml`. 
 
+![config4](/readme_images/AndroidAppConfig_4.png "Replace files")
+
 This implementation was adapted and modified from this template server socket code from Jennifer Nicholas https://www.tutorialspoint.com/sending-and-receiving-data-with-sockets-in-android
 
-It should be noted that the Android Application will not be able to be utilized without a physical Android Device, as the scope of the network on the Android Device Emulator does not reach outside the emulator, and therefore will not be able to connect to the Python code. 
+It should be noted that the Android Application will not be able to be utilized without a **physical Android Device**, as the scope of the network on the Android Device Emulator does not reach outside the emulator, and therefore will not be able to connect to the Python code. 
 
 To run the application on your Android device, debugging mode must be enabled. Follow these instructions to enable USB debugging on your device: https://developer.android.com/studio/debug/dev-options
 
@@ -89,7 +106,9 @@ The program NDNsim.py contains 16 arguments for the NDN simulator.
 | -ipt, --iperf_test	| False	| True or False | Toggle to determine whether the simulation will generate dummy data or generate data via iperf3. |
 
 To run with default values, you can simply use:
-```python3 NDNsim.py```
+```
+python3 NDNsim.py
+```
 To run with command line inputs: 
 ```
 python3 NDNsim.py -o "metric_outfile.csv" -tp "topology.txt" -w "uniform:0, 1" -r "uniform:0, 2" -fd "uniform:1, 1" -fr "0, 0.01" -pnco "3:uniform:0, 8" -v "uniform:0, 2" -pgn "5" -pd "uniform:0, 0.01" -l "uniform:0, 0.5" -d "3:uniform:0, 0.5" -to "5" -log "False" -pt "False" -ipt "False"
@@ -122,4 +141,6 @@ You will additionally need to modify all other parameters to match the same numb
 `TOPFILE=("topology.txt" "topology.txt" "topology.txt" "topology.txt" "topology.txt")`
 
 To use the bash script, simply run ```bash NDNsim_bash.sh``` after modifying the file to your specifications.
+
+## Expected Results
 

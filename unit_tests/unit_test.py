@@ -3,6 +3,7 @@
 
 import unittest, sys, logging, io
 import numpy as np
+from threading import Lock
 sys.path.insert(1, '../')
 import NDNsim
 
@@ -16,7 +17,7 @@ class TestHybridName(unittest.TestCase): #Hybrid Name
 	print("Starting Hybrid Name Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Tests object is correctly made
+	#Tests object is correctly made (1)
 	#-------------------------------------
 	def test_Hybrid_Creation_1(self):
 		#Object 1
@@ -40,7 +41,7 @@ class TestHybridName(unittest.TestCase): #Hybrid Name
 		self.assertEqual(output, expected)
 		
 	#-------------------------------------	
-	#Tests original object isnt overwritten on new object creation
+	#Tests original object isnt overwritten on new object creation (2)
 	#-------------------------------------
 	def test_Hybrid_Creation_2(self):
 		#Object 1
@@ -68,7 +69,7 @@ class TestHybridName(unittest.TestCase): #Hybrid Name
 		self.assertEqual(output, expected)
 
 	#-------------------------------------
-	#Tests changing fields only effects 1 object
+	#Tests changing fields only effects 1 object (3)
 	#-------------------------------------
 	def test_Hybrid_Modification_1(self):
 		#Object 1
@@ -120,7 +121,7 @@ class TestPacket(unittest.TestCase): #Packet
 	print("Starting Packet Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Tests object is correctly made
+	#Tests object is correctly made (4)
 	#-------------------------------------
 	def test_Packet_Creation_1(self):
 		#Object 1
@@ -145,7 +146,7 @@ class TestPacket(unittest.TestCase): #Packet
 		self.assertEqual(output, expected)
 		
 	#-------------------------------------	
-	#Tests original object isnt overwritten on new object creation
+	#Tests original object isnt overwritten on new object creation (5)
 	#-------------------------------------
 	def test_Packet_Creation_2(self):
 		#Object 1
@@ -175,7 +176,7 @@ class TestPacket(unittest.TestCase): #Packet
 		self.assertEqual(output, expected)
 
 	#-------------------------------------
-	#Tests changing fields only effects 1 object
+	#Tests changing fields only effects 1 object (6)
 	#-------------------------------------
 	def test_Packet_Modification_1(self):
 		#Object 1
@@ -232,7 +233,7 @@ class TestPIT_Entry(unittest.TestCase): #PIT_Entry
 	print("Starting PIT Entry Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Tests object is correctly made
+	#Tests object is correctly made (7)
 	#-------------------------------------
 	def test_PIT_Entry_Creation_1(self):
 		#Object 1
@@ -255,7 +256,7 @@ class TestPIT_Entry(unittest.TestCase): #PIT_Entry
 		self.assertEqual(output, expected)
 		
 	#-------------------------------------	
-	#Tests original object isnt overwritten on new object creation
+	#Tests original object isnt overwritten on new object creation (8)
 	#-------------------------------------
 	def test_PIT_Entry_Creation_2(self):
 		#Object 1
@@ -283,7 +284,7 @@ class TestPIT_Entry(unittest.TestCase): #PIT_Entry
 		self.assertEqual(output, expected)
 
 	#-------------------------------------
-	#Tests changing fields only effects 1 object
+	#Tests changing fields only effects 1 object (9)
 	#-------------------------------------
 	def test_PIT_Entry_Modification_1(self):
 		#Object 1
@@ -340,7 +341,7 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 	print("Starting Cache Entry Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Tests object is correctly made
+	#Tests object is correctly made (10)
 	#-------------------------------------
 	def test_Cache_Entry_Creation_1(self):
 		#Object 1
@@ -363,7 +364,7 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 		self.assertEqual(output, expected)
 		
 	#-------------------------------------	
-	#Tests original object isnt overwritten on new object creation
+	#Tests original object isnt overwritten on new object creation (11)
 	#-------------------------------------
 	def test_Cache_Entry_Creation_2(self):
 		#Object 1
@@ -392,7 +393,7 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 		self.assertEqual(output, expected)
 
 	#-------------------------------------
-	#Tests changing fields only effects 1 object
+	#Tests changing fields only effects 1 object (12)
 	#-------------------------------------
 	def test_Cache_Entry_Modification_1(self):
 		#Object 1
@@ -452,7 +453,7 @@ class TestNode(unittest.TestCase): #Node
 	print("Starting Node Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Tests object is correctly made
+	#Tests object is correctly made (13)
 	#-------------------------------------
 	def test_Node_Creation_1(self):
 		#Object 1
@@ -475,7 +476,7 @@ class TestNode(unittest.TestCase): #Node
 		self.assertEqual(output, expected)
 
 	#-------------------------------------	
-	#Tests original object isnt overwritten on new object creation
+	#Tests original object isnt overwritten on new object creation (14)
 	#-------------------------------------
 	def test_Node_Creation_2(self):
 		#Object 1
@@ -503,7 +504,7 @@ class TestNode(unittest.TestCase): #Node
 		self.assertEqual(output, expected)
 
 	#-------------------------------------
-	#Tests changing fields only effects 1 object
+	#Tests changing fields only effects 1 object (15)
 	#-------------------------------------
 	def test_Node_Modification_1(self):
 		#Object 1
@@ -570,7 +571,7 @@ class TestTopology(unittest.TestCase): #Node
 	print("Starting Topology Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Tests object is correctly made
+	#Tests object is correctly made (16)
 	#-------------------------------------
 	def test_Topology_Creation_1(self):
 		#Setting seeds for distribution
@@ -606,7 +607,7 @@ class TestTopology(unittest.TestCase): #Node
 		self.assertEqual(output, expected)
 
 	#-------------------------------------	
-	#Tests original object isnt overwritten on new object creation
+	#Tests original object isnt overwritten on new object creation (17)
 	#-------------------------------------
 	def test_Topology_Creation_2(self):
 		#Setting seeds for distribution
@@ -645,7 +646,7 @@ class TestTopology(unittest.TestCase): #Node
 		self.assertEqual(output, expected)
 		
 	#-------------------------------------
-	#Tests changing fields only effects 1 object
+	#Tests changing fields only effects 1 object (18)
 	#-------------------------------------
 	def test_Topology_Modification_1(self):
 		#Setting seeds for distribution
@@ -714,7 +715,7 @@ class TestTopology(unittest.TestCase): #Node
 		self.assertEqual(output, expected)
 		
 	#-------------------------------------
-	#File exists checks
+	#File exists checks (19)
 	#-------------------------------------
 	def test_Topology_File_Exists_1(self):
 		#Setting seeds for distribution
@@ -739,7 +740,7 @@ class TestTopology(unittest.TestCase): #Node
 		self.assertEqual(output, "Error! File does not exist!")
 		
 	#-------------------------------------
-	#Assertion checks - missing cell
+	#Assertion checks - missing cell (20)
 	#-------------------------------------
 	def test_Topology_Assertion_1(self):
 		#Setting seeds for distribution
@@ -764,7 +765,7 @@ class TestTopology(unittest.TestCase): #Node
 		self.assertEqual(output, "Error! Differing amount of columns for nodes and weights")
 		
 	#-------------------------------------
-	#Assertion checks - missing row
+	#Assertion checks - missing row (21)
 	#-------------------------------------
 	def test_Topology_Assertion_2(self):
 		#Setting seeds for distribution
@@ -789,7 +790,7 @@ class TestTopology(unittest.TestCase): #Node
 		self.assertEqual(output, "Error! Differing amount of columns for nodes and weights")
 		
 	#-------------------------------------
-	#Assertion checks - missing column
+	#Assertion checks - missing column (22)
 	#-------------------------------------
 	def test_Topology_Assertion_3(self):
 		#Setting seeds for distribution
@@ -815,12 +816,12 @@ class TestTopology(unittest.TestCase): #Node
 #-------------------------------------------------------------------------------	
 	
 #-------------------------------------------------------------------------------
-class TestDistributionHelper(unittest.TestCase): #Distribution Helper
+class TestDistributionHelper(unittest.TestCase): #distribution_helper
 
 	print("Starting Distribution Helper Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Uniform random number check
+	#Uniform random number check (23)
 	#-------------------------------------
 	def test_uniform_random_number(self):
 		#Setting seeds for distribution
@@ -830,7 +831,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, np.float64(0.834044009405148))
 	
 	#-------------------------------------
-	#Uniform cdf check
+	#Uniform cdf check (24)
 	#-------------------------------------	
 	def test_uniform_cdf(self):
 		#Setting seeds for distribution
@@ -840,7 +841,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, np.float64(0.417022004702574))
 
 	#-------------------------------------
-	#Uniform random number check if same values
+	#Uniform random number check if same values (25)
 	#-------------------------------------	
 	def test_uniform_same_value_random_number(self):
 		#Setting seeds for distribution
@@ -850,7 +851,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, 0)
 		
 	#-------------------------------------
-	#Uniform cdf check if same values
+	#Uniform cdf check if same values (26)
 	#-------------------------------------	
 	def test_uniform_same_value_cdf(self):
 		#Setting seeds for distribution
@@ -860,7 +861,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, 1)		
 		
 	#-------------------------------------
-	#Assertion checks - uniform min > max
+	#Assertion checks - uniform min > max (27)
 	#-------------------------------------
 	def test_uniform_assertion(self):
 		#Setting seeds for distribution
@@ -884,7 +885,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, "Error! Maximum value larger than minimum value")		
 		
 	#-------------------------------------
-	#Gaussian/normal random number check
+	#Gaussian/normal random number check (28)
 	#-------------------------------------	
 	def test_gaussian_random_number(self):
 		#Setting seeds for distribution
@@ -894,7 +895,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, np.float64(1.6243453636632417))
 		
 	#-------------------------------------
-	#Gaussian/normal cdf check
+	#Gaussian/normal cdf check (29)
 	#-------------------------------------	
 	def test_gaussian_cdf(self):
 		#Setting seeds for distribution
@@ -904,7 +905,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, np.float64(0.9478489396588523))
 		
 	#-------------------------------------
-	#Gaussian/normal random number check if std = 0
+	#Gaussian/normal random number check if std = 0 (30)
 	#-------------------------------------	
 	def test_gaussian_random_number_std_0(self):
 		#Setting seeds for distribution
@@ -914,7 +915,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, 0)
 		
 	#-------------------------------------
-	#Gaussian/normal cdf check if std = 0
+	#Gaussian/normal cdf check if std = 0 (31)
 	#-------------------------------------	
 	def test_gaussian_cdf_std_0(self):
 		#Setting seeds for distribution
@@ -924,7 +925,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, 1)		
 		
 	#-------------------------------------
-	#Zipf random number check
+	#Zipf random number check (32)
 	#-------------------------------------	
 	def test_zipf_random_number(self):
 		#Setting seeds for distribution
@@ -934,7 +935,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, 1)
 		
 	#-------------------------------------
-	#Zipf cdf check
+	#Zipf cdf check (33)
 	#-------------------------------------	
 	def test_zipf_cdf(self):
 		#Setting seeds for distribution
@@ -944,7 +945,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, np.float64(0.6079271018540265))
 		
 	#-------------------------------------
-	#Assertion checks - a > 1
+	#Assertion checks - a > 1 (34)
 	#-------------------------------------
 	def test_zipf_assertion(self):
 		#Setting seeds for distribution
@@ -968,7 +969,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, "Error! a must be greater than 1")		
 				
 	#-------------------------------------
-	#Assertion checks - negative values
+	#Assertion checks - negative values (35)
 	#-------------------------------------
 	def test_negative_assertion(self):
 		#Setting seeds for distribution
@@ -1012,9 +1013,9 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, "Error! One or more values is negative")		
 		
 	#-------------------------------------
-	#Assertion checks - wrong number of values
+	#Assertion checks - wrong number of values (36)
 	#-------------------------------------		
-	def test_negative_assertion(self):
+	def test_incorrect_assertion(self):
 		#Setting seeds for distribution
 		np.random.seed(seed=1)
 		
@@ -1116,7 +1117,7 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		self.assertEqual(output, "Error! Values must be a list of len 1 for zipf")						
 
 	#-------------------------------------
-	#Assertion checks - unknown distribution
+	#Assertion checks - unknown distribution (37)
 	#-------------------------------------	
 	def test_unknown_assertion(self):		
 		#Setting seeds for distribution
@@ -1139,70 +1140,530 @@ class TestDistributionHelper(unittest.TestCase): #Distribution Helper
 		sys.stdout = prev_stdout
 		self.assertEqual(output, "Error! Unrecognized distribution")				
 #-------------------------------------------------------------------------------	
-'''
+
 #-------------------------------------------------------------------------------
 class TestGeneratePackets(unittest.TestCase): #generate_packets
 
 	print("Starting Generate Packets Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Generate 1 packet
+	#Generate 0 packets (38)
+	#-------------------------------------
+	def test_generate_0_packet(self):
+		packet = NDNsim.Packet()
+		new_packets, total_size = NDNsim.generate_packets(packet, 0, "")
+		self.assertEqual(len(new_packets), 0)	
+		self.assertEqual(total_size, 0)
+		
+	#-------------------------------------
+	#Generate 1 packet (39)
 	#-------------------------------------
 	def test_generate_1_packet(self):
+		packet = NDNsim.Packet()
+		new_packets, total_size = NDNsim.generate_packets(packet, 1, "")
+		packet_output = []
+	
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		#Capture print
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+			output = out.getvalue().rstrip()
+			packet_output.append(output)
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		
+		#Compare output
+		expected_1 = 'No Hierarchical Name!\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: 0\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 1\nPayload: 0\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(packet_output[0], expected)
+		self.assertEqual(total_size, 1)
+		
+	#-------------------------------------
+	#Generate 1 packet with a name (40)
+	#-------------------------------------
+	def test_generate_1_name_packet(self):
+		packet = NDNsim.Packet()
+		packet.name = NDNsim.Hybrid_Name()
+		new_packets, total_size = NDNsim.generate_packets(packet, 1, "")
+		packet_output = []
+	
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		#Capture print
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+			output = out.getvalue().rstrip()
+			packet_output.append(output)
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		
+		#Compare output
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: ' + str(hash(str(0))) + '\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: 0\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 1\nPayload: 0\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(packet_output[0], expected)
+		self.assertEqual(total_size, 1)		
 	
 	#-------------------------------------
-	#Generate 10 packets
+	#Generate 10 packets (41)
 	#-------------------------------------	
-	def test_generate_10_packets(self):
+	def test_generate_15_packets(self):
 	
+		#Setting the number of packets and the total size
+		num_packets = 2
+		size = 0
+		for x in range(num_packets):
+			size = size + len(str(x))
+			
+		#Creating and generating packets
+		packet = NDNsim.Packet()
+		new_packets, total_size = NDNsim.generate_packets(packet, num_packets, "")
+		packet_output = []
+	
+		#Capture print
+		for x in range(len(new_packets)):
+		
+			#Redirect STD
+			prev_stdout = sys.stdout
+			out = io.StringIO()
+			sys.stdout = out
+			
+			new_packets[x].print_info()
+			output = out.getvalue().rstrip()
+			packet_output.append(output)
+		
+			#Redirect STD
+			sys.stdout = prev_stdout
+
+			expected_1 = 'No Hierarchical Name!\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(num_packets) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: ' + str(size) + '\nPayload: ' + str(x) + '\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			expected = expected_1 + expected_2
+			self.assertEqual(packet_output[x], expected)
+		self.assertEqual(total_size, size)	
+		
 	#-------------------------------------
-	#Generate packets according to iperf
+	#Generate packets according to iperf (42)
 	#-------------------------------------
 	def test_iperf3_generation(self):
-	
+		iperf_string = """Client: Connecting to host localhost, port 5201
+[  5] local 127.0.0.1 port 57126 connected to 127.0.0.1 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec  7.15 GBytes  61.4 Gbits/sec    0   1.69 MBytes       
+[  5]   1.00-2.00   sec  7.28 GBytes  62.5 Gbits/sec    0   1.69 MBytes       
+[  5]   2.00-3.00   sec  7.34 GBytes  63.0 Gbits/sec    0   1.69 MBytes       
+[  5]   3.00-4.00   sec  7.12 GBytes  61.2 Gbits/sec    0   1.69 MBytes       
+[  5]   4.00-5.00   sec  7.49 GBytes  64.3 Gbits/sec    0   1.69 MBytes       
+[  5]   5.00-6.00   sec  7.35 GBytes  63.1 Gbits/sec    0   1.69 MBytes       
+[  5]   6.00-7.00   sec  7.34 GBytes  63.0 Gbits/sec    0   3.93 MBytes       
+[  5]   7.00-8.00   sec  7.34 GBytes  63.1 Gbits/sec    0   3.93 MBytes       
+[  5]   8.00-9.00   sec  7.31 GBytes  62.8 Gbits/sec    0   3.93 MBytes       
+[  5]   9.00-10.00  sec  7.30 GBytes  62.7 Gbits/sec    0   3.93 MBytes       
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.00  sec  73.0 GBytes  62.7 Gbits/sec    0             sender
+[  5]   0.00-10.04  sec  73.0 GBytes  62.5 Gbits/sec                  receiver
+
+iperf Done.
+		"""
+		
+		#Dividing the payload into 256 byte chunks
+		payload = []
+		string = ''
+		for x in range(len(iperf_string)):
+			string = string + iperf_string[x]
+			if len(string) == 256:
+				payload.append(string)
+				string = '' 
+		if string != '':
+			payload.append(string)
+			
+		#Setting the number of packets and the total size
+		size = len(iperf_string)
+			
+		#Creating and generating packets
+		packet = NDNsim.Packet()
+		new_packets, total_size = NDNsim.generate_packets(packet, 0, iperf_string)
+		packet_output = []
+
+		#Capture print
+		for x in range(len(new_packets)):
+		
+			#Redirect STD
+			prev_stdout = sys.stdout
+			out = io.StringIO()
+			sys.stdout = out
+			
+			new_packets[x].print_info()
+			output = out.getvalue().rstrip()
+			packet_output.append(output)
+		
+			#Redirect STD
+			sys.stdout = prev_stdout
+
+			expected_1 = 'No Hierarchical Name!\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(len(new_packets)) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: ' + str(size) + '\nPayload: '
+			expected_3 = payload[x]
+			expected_4 = '\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			expected = expected_1 + expected_2 + expected_3 + expected_4
+			self.assertEqual(packet_output[x], expected)
+		self.assertEqual(total_size, size)
+		
+	#-------------------------------------
+	#Generate packets according to iperf with a name (43)
+	#-------------------------------------
+	def test_iperf3_name_generation(self):
+		iperf_string = """Client: Connecting to host localhost, port 5201
+[  5] local 127.0.0.1 port 57126 connected to 127.0.0.1 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec  7.15 GBytes  61.4 Gbits/sec    0   1.69 MBytes       
+[  5]   1.00-2.00   sec  7.28 GBytes  62.5 Gbits/sec    0   1.69 MBytes       
+[  5]   2.00-3.00   sec  7.34 GBytes  63.0 Gbits/sec    0   1.69 MBytes       
+[  5]   3.00-4.00   sec  7.12 GBytes  61.2 Gbits/sec    0   1.69 MBytes       
+[  5]   4.00-5.00   sec  7.49 GBytes  64.3 Gbits/sec    0   1.69 MBytes       
+[  5]   5.00-6.00   sec  7.35 GBytes  63.1 Gbits/sec    0   1.69 MBytes       
+[  5]   6.00-7.00   sec  7.34 GBytes  63.0 Gbits/sec    0   3.93 MBytes       
+[  5]   7.00-8.00   sec  7.34 GBytes  63.1 Gbits/sec    0   3.93 MBytes       
+[  5]   8.00-9.00   sec  7.31 GBytes  62.8 Gbits/sec    0   3.93 MBytes       
+[  5]   9.00-10.00  sec  7.30 GBytes  62.7 Gbits/sec    0   3.93 MBytes       
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.00  sec  73.0 GBytes  62.7 Gbits/sec    0             sender
+[  5]   0.00-10.04  sec  73.0 GBytes  62.5 Gbits/sec                  receiver
+
+iperf Done.
+		"""
+		
+		#Dividing the payload into 256 byte chunks
+		payload = []
+		string = ''
+		for x in range(len(iperf_string)):
+			string = string + iperf_string[x]
+			if len(string) == 256:
+				payload.append(string)
+				string = '' 
+		if string != '':
+			payload.append(string)
+			
+		#Setting the number of packets and the total size
+		size = len(iperf_string)
+			
+		#Creating and generating packets
+		packet = NDNsim.Packet()
+		packet.name = NDNsim.Hybrid_Name()
+		new_packets, total_size = NDNsim.generate_packets(packet, 0, iperf_string)
+		packet_output = []
+
+		#Capture print
+		for x in range(len(new_packets)):
+		
+			#Redirect STD
+			prev_stdout = sys.stdout
+			out = io.StringIO()
+			sys.stdout = out
+			
+			new_packets[x].print_info()
+			output = out.getvalue().rstrip()
+			packet_output.append(output)
+		
+			#Redirect STD
+			sys.stdout = prev_stdout
+
+			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: ' + str(hash(payload[x])) + '\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(len(new_packets)) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: ' + str(size) + '\nPayload: '
+			expected_3 = payload[x]
+			expected_4 = '\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			expected = expected_1 + expected_2 + expected_3 + expected_4
+			self.assertEqual(packet_output[x], expected)
+		self.assertEqual(total_size, size)		
 #-------------------------------------------------------------------------------	
-	
+
 #-------------------------------------------------------------------------------
 class TestNextGateway(unittest.TestCase): #next_gateway
 
 	print("Starting Next Gateway Tests")	
 	maxDiff = None
 	#-------------------------------------
+	#Tests the next gateway for an empty list (44)
+	#-------------------------------------
+	def test_next_empty_list(self):
+		#Init globals
+		NDNsim.phone_node_connect_order_counter = 0
+		phone_node_connect_order_counter_lock = Lock()
+		
+		output = NDNsim.next_gateway(NDNsim.Node(), 0.0, [])
+		self.assertEqual(NDNsim.phone_node_connect_order_counter, 1)
+		self.assertEqual(output, -1)
+
+	#-------------------------------------
+	#Tests the next gateway for a 2 sized list (45)
+	#-------------------------------------	
+	def test_next_2_item_list(self):
+		#Init globals
+		NDNsim.phone_node_connect_order_counter = 0
+		phone_node_connect_order_counter_lock = Lock()
+		
+		output = NDNsim.next_gateway(NDNsim.Node(), 0.0, [1, 2])
+		self.assertEqual(NDNsim.phone_node_connect_order_counter, 1)
+		self.assertEqual(output, 2)
+		
+	#-------------------------------------
+	#Tests the next gateway for the end of the list (46)
+	#-------------------------------------		
+	def test_next_end_of_list(self):
+		#Init globals
+		NDNsim.phone_node_connect_order_counter = 0
+		phone_node_connect_order_counter_lock = Lock()
+		
+		output = NDNsim.next_gateway(NDNsim.Node(), 0.0, [1])
+		self.assertEqual(NDNsim.phone_node_connect_order_counter, 1)
+		self.assertEqual(output, -1)
 	
-	def test_empty_list(self):
-	def test_1_item_list(self):
-	def test_5_item_list(self):
-	def test_end_of_list(self):
-	
+	#-------------------------------------
+	#Tests the next gateway for a 5 sized list (47)
+	#-------------------------------------		
+	def test_next_complete_test(self):
+		#Init globals
+		NDNsim.phone_node_connect_order_counter = 0
+		phone_node_connect_order_counter_lock = Lock()
+		
+		for x in range(5):
+			output = NDNsim.next_gateway(NDNsim.Node(), 0.0, [1, 2, 3, 4, 5])
+			self.assertEqual(NDNsim.phone_node_connect_order_counter, x+1)
+			if x == 4:
+				self.assertEqual(output, -1)
+			else:
+				self.assertEqual(output, x+2)
+
 #-------------------------------------------------------------------------------	
-	
+
 #-------------------------------------------------------------------------------
 class TestCalcLinger(unittest.TestCase): #calc_linger
 
 	print("Starting Calc Linger Tests")	
 	maxDiff = None
 	#-------------------------------------
-	
-	def test_getValue(self):
-	
+	#Tests the function (most work is done by distribution helper) (48)
+	#-------------------------------------
+	def test_calc_linger_getValue(self):
+		#Setting seeds for distribution
+		np.random.seed(seed=1)
+		
+		output = NDNsim.calc_linger(0.0, 0.0, ["uniform", "0, 2"])
+		self.assertEqual(output, np.float64(0.834044009405148))
+		
+	#-------------------------------------
+	#Assertion check - not numbers (49)
+	#-------------------------------------
+	def test_calc_linger_assertion(self):
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		with self.assertRaises(SystemExit) as cm:
+			output = NDNsim.calc_linger(0.0, 0.0, ["uniform", "a, 2"])	
+		
+		self.assertEqual(cm.exception.code, 1)
+		
+		#Capture print
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, "Error! Value(s) in: a, 2 must be numbers")
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		with self.assertRaises(SystemExit) as cm:
+			output = NDNsim.calc_linger(0.0, 0.0, ["uniform", "1, b"])	
+		
+		self.assertEqual(cm.exception.code, 1)
+		
+		#Capture print
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, "Error! Value(s) in: 1, b must be numbers")
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		with self.assertRaises(SystemExit) as cm:
+			output = NDNsim.calc_linger(0.0, 0.0, ["zipf", "a"])	
+		
+		self.assertEqual(cm.exception.code, 1)
+		
+		#Capture print
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, "Error! Value(s) in: a must be numbers")
 #-------------------------------------------------------------------------------	
-	
+
+#-------------------------------------------------------------------------------
+class TestSplitDistString(unittest.TestCase): #split_dist_string
+
+	print("Starting Split Dist String Tests")	
+	maxDiff = None
+	#-------------------------------------
+	#Tests the function (most work is done by distribution helper) (50)
+	#-------------------------------------
+	def test_split_dist_get_value(self):
+		#Setting seeds for distribution
+		np.random.seed(seed=1)
+		
+		output = NDNsim.split_dist_string("3:uniform:0, 8")
+		expected = [np.float64(3.336176037620592), np.float64(5.762595947537265), np.float64(0.0009149985387590931)]
+		for x in range(len(output)):
+			self.assertEqual(output[x], expected[x])
+		
+	#-------------------------------------
+	#Tests the formatting to see if 3 values (51)
+	#-------------------------------------
+	def test_split_dist_assertion_1(self):
+		#Setting seeds for distribution
+		np.random.seed(seed=1)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		with self.assertRaises(SystemExit) as cm:
+			output = NDNsim.split_dist_string("3:uniform")
+		
+		self.assertEqual(cm.exception.code, 1)
+		
+		#Capture print
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, "Error! Problem formatting string: 3:uniform")	
+		
+	#-------------------------------------
+	#Tests the formatting to see if first value is int (52)
+	#-------------------------------------
+	def test_split_dist_assertion_2(self):
+		#Setting seeds for distribution
+		np.random.seed(seed=1)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		with self.assertRaises(SystemExit) as cm:
+			output = NDNsim.split_dist_string("a:uniform:0, 8")
+		
+		self.assertEqual(cm.exception.code, 1)
+		
+		#Capture print
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, "Error! First value in string: a:uniform:0, 8 must be an int")	
+
+	#-------------------------------------
+	#Tests the formatting to see if 3rd values are numbers (53)
+	#-------------------------------------	
+	def test_split_dist_assertion_3(self):
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		with self.assertRaises(SystemExit) as cm:
+			output = NDNsim.split_dist_string("1:uniform:a, 2")
+		
+		self.assertEqual(cm.exception.code, 1)
+		
+		#Capture print
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, "Error! Value(s) in: a, 2 must be numbers")
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		with self.assertRaises(SystemExit) as cm:
+			output = NDNsim.split_dist_string("1:uniform:1, b")	
+		
+		self.assertEqual(cm.exception.code, 1)
+		
+		#Capture print
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, "Error! Value(s) in: 1, b must be numbers")
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		with self.assertRaises(SystemExit) as cm:
+			output = NDNsim.split_dist_string("1:zipf:a")	
+		
+		self.assertEqual(cm.exception.code, 1)
+		
+		#Capture print
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, "Error! Value(s) in: a must be numbers")		
+#-------------------------------------------------------------------------------	
+
 #-------------------------------------------------------------------------------
 class TestDijkstras(unittest.TestCase): #dijkstras
 
 	print("Starting Dijkstras Tests")	
 	maxDiff = None
 	#-------------------------------------
-	
+	#Checks for a simple line topology
+	#-------------------------------------
 	def test_1_node_topology(self):
+		topology = NDNsim.Topology('./topologies/small_topology.txt')
+		topology.print_info()
+		#only need to modifiy 'weights'
+	
 	def test_2_node_topology(self):
+		pass
 	def test_5_node_topology(self):
+		pass
 	def test_50_node_topology(self):
+		pass
 	def test_same_weights(self):
+		pass
 	def test_varying_weights(self):
+		pass
 	
 #-------------------------------------------------------------------------------	
-	
+'''	
 #-------------------------------------------------------------------------------
 class TestSocketCode(unittest.TestCase): #socket_code
 
@@ -1291,15 +1752,7 @@ class TestCloseThreads(unittest.TestCase): #close_threads TODO Mayebe
 	
 #-------------------------------------------------------------------------------	
 
-#-------------------------------------------------------------------------------
 
-class TestSplitDistString(unittest.TestCase): #split_dist_string
-
-	print("Starting Distribution Helper Tests")	
-	maxDiff = None
-	#-------------------------------------
-	
-	def test_CorrectFormat(self):
 '''
 	
 if __name__ == '__main__':
