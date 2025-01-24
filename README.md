@@ -8,18 +8,18 @@
    - Android SDK Installation
      - Android Application Configuration
  - Running
+   - Configuring NDNsim For Android Device
    - Command Line Inputs
-  - Configuring NDNsim For Android Device
    - Configuring bash script
  - Expected Results
 
 ## Project Description
 
-This project is a simulation for NDN with a mobile consumer. This simulation is made for Iris Chen's 2024 Master's Thesis, "Mobile Consumer Architecture For Named Data Networking" at George Mason Unversity under Doctor Robert Simon.
+This project is a simulation for NDN with a mobile consumer. This simulation is made for Iris Chen's 2024 Master Thesis, "Mobile Consumer Architecture For Named Data Networking" at George Mason Unversity under Doctor Robert Simon.
 
-This simulation acts as a generalizable model for consumer mobility in NDN utilizing a mobility function to do proactive caching. 
+This simulation acts as a generalizable model for consumer mobility in NDN, utilizing proactive caching AKA precaching based on a linger time and probabilistic precaching based on probability of link failure. This simulation is implemented at the application layer with a python program on PC and a java application on Android.
 
-This simulation is created and tested in Linux and Android SDK only.
+This simulation is created and tested in Linux 22.04.5 LTS and Android SDK 2024.1.2.
 
 ## Installation
 
@@ -33,7 +33,7 @@ sudo apt-get install python3.10.12
 
 ### Iperf3 Installation
 
-Iperf3 is utilized for data generation and it is not necessarily required if simulator is not run with iperf3 toggled on. 
+Iperf3 is utilized for data generation and it is not required if simulator is not run with iperf3 toggled on. 
 
 Install iperf3 via the iperf3 website. https://iperf.fr/iperf-download.php
 ```
@@ -43,6 +43,7 @@ sudo apt-get install iperf3
 ### Android SDK Installation
 
 Installation instructions: https://stackoverflow.com/questions/34556884/how-to-install-android-sdk-on-ubuntu
+
 Official installation instructions: https://developer.android.com/studio/install
 
 Install latest version: 
@@ -75,19 +76,41 @@ Next, replace the contents of `app/res/layout/activity_main.xml` , `app/java/com
 
 This implementation was adapted and modified from this template server socket code from Jennifer Nicholas https://www.tutorialspoint.com/sending-and-receiving-data-with-sockets-in-android
 
-It should be noted that the Android Application will not be able to be utilized without a **physical Android Device**, as the scope of the network on the Android Device Emulator does not reach outside the emulator, and therefore will not be able to connect to the Python code. 
+It should be noted that the Android Application will not be able to be utilized without a **physical Android Device**, as the scope of the network on the Android Device Emulator does not reach outside the emulator, and therefore will not be able to connect to the Python program on PC. 
 
-To run the application on your Android device, debugging mode must be enabled. Follow these instructions to enable USB debugging on your device: https://developer.android.com/studio/debug/dev-options
+To run the application on your Android device, **USB debugging** must be enabled. Typically, this can be done by going into `Settings > System > Developer Options > USB Debugging` on your Android device. For specific Android version instructions: https://developer.android.com/studio/debug/dev-options#Enable-debugging
 
 
 ## Running
+
+### Configuring NDNsim For Android Device
+
+To run with the Android Device, first run the Android application using the **debugging button** or **run button** on Android SDK. 
+
+The physical Android device should open the application automatically. On the application, the screen should display an IP port, and "Not Connected" at the top and a button that says "SEND INTEREST" at the bottom. 
+
+The IP may be different depending on your network connection, so please modify `NDNsim.py` line 17 to reflect the IP displayed on your Android Device. It should be noted that simply 'localhost' will not work.
+
+```
+phone_ip =  '192.168.1.207'
+```
+
+Next, execute the python program with the phone_test option on
+
+```
+python3 NDNsim.py -pt True
+```
+
+Now, unless you are waiting for iperf3 to generate data, the text on the Android App should read "Connected". Now that it is connected, tap the "SEND INTEREST" button to begin the NDN simulator.
+
+Once the simulator is complete, you should see the requested data displayed on the phone screen. This may be dummy data (The numbers 1, 2, 3, 4, 5) or the generated iperf3 data.
 
 ### Command Line Inputs
 
 The program NDNsim.py contains 16 arguments for the NDN simulator.
 
 | cmd line option    | Default	| Format | Description |
-| -------- | ------- |  ------- |  ------- | 
+| --- | ---- |  ----- |  --------- | 
 | -o,--outfile	| 'metric_outfile.csv'	| filename | Output file for simulation metrics. Appended to if exists already, creates if not. |
 | -tp,--topfile	| 'topology.txt'	| filename | The file to read in the topology of the NDN system. |
 | -w,--weights	| 'uniform:0, 1'	| distribution:distrubution values | The lambda_ values (aka transmission rates) for each link in the topology chosen from the given probability distribution. The default, "uniform:0, 1" means that each link has a transmission rate chosen by the uniform probability distrobution between 0-1 |
@@ -106,41 +129,31 @@ The program NDNsim.py contains 16 arguments for the NDN simulator.
 | -ipt, --iperf_test	| False	| True or False | Toggle to determine whether the simulation will generate dummy data or generate data via iperf3. |
 
 To run with default values, you can simply use:
+
 ```
 python3 NDNsim.py
 ```
+
 To run with command line inputs: 
+
 ```
 python3 NDNsim.py -o "metric_outfile.csv" -tp "topology.txt" -w "uniform:0, 1" -r "uniform:0, 2" -fd "uniform:1, 1" -fr "0, 0.01" -pnco "3:uniform:0, 8" -v "uniform:0, 2" -pgn "5" -pd "uniform:0, 0.01" -l "uniform:0, 0.5" -d "3:uniform:0, 0.5" -to "5" -log "False" -pt "False" -ipt "False"
 ```
 
-### Configuring NDNsim For Android Device
-
-To run with the Android Device, first run the Android application using the debugging button or run button on Android SDK. It should have an IP port, and "Not Connected" on the top of screen with a button that says "SEND INTEREST" at the bottom. 
-
-The IP may be different depending on your network connection, so please modify `NDNsim.py` line 17 to reflect the IP displayed on your Android Device. It should be noted that simply 'localhost' will not work.
-
-`phone_ip =  '192.168.1.207'`
-
-Next, run the python code with the phone_test option on
-
-`python3 NDNsim.py -pt True`
-
-Now, unless you are waiting for iperf3 to generate data, the text on the Android App should read "Connected". Now that it is connected, tap the "SEND INTEREST" button to begin the NDN simulator.
-
-Once the simulator is complete, you should see the requested data displayed on the phone screen. This may be dummy data (The numbers 1, 2, 3, 4, 5) or the generated iperf3 data.
-
 ### Configuring bash script
 
-The file NDNsim_bash.sh allows you to execute batch runs of NDNsim.py with your specified parameters. The lines 2 through 11 allow you to specify the parameters for each run you are interested in executing. 
+The file NDNsim_bash.sh allows you to execute batch runs of NDNsim.py with your specified parameters. This requires knowledge of Bash and the command line inputs. 
 
 For example, if you want to execute 5 runs of NDNsim.py with the same topology file and the varying timeouts as 5, 4, 3, 2, and 1, then you would change line 5 of NDNsim_bash.sh to be: 
 `TIMEOUT=("5" "4" "3" "2" "1")`
 
-You will additionally need to modify all other parameters to match the same number of runs that you plan on making. So for example, you would also need to modify line 2 to be: 
-`TOPFILE=("topology.txt" "topology.txt" "topology.txt" "topology.txt" "topology.txt")`
+After modifying the file to your specifications, execute the bash script with:
 
-To use the bash script, simply run ```bash NDNsim_bash.sh``` after modifying the file to your specifications.
+```
+bash NDNsim_bash.sh
+```
 
 ## Expected Results
 
+
+### Android 
