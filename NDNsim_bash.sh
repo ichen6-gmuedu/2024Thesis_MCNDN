@@ -7,6 +7,10 @@ METRICFILE=("metric_outfile.csv")
 rm $METRICFILE
 
 echo "--------------------TESTING DEFAULT 5 times--------------------"
+IP=("localhost")
+PORT=("8080")
+PHONE_IP=("192.168.1.207")
+PHONE_PORT=("9095")
 TOPFILE=("topology.txt")
 WEIGHTDIST=("uniform:0, 1")
 RANGE=("uniform:0, 2")
@@ -27,12 +31,16 @@ IPERF_TEST=("False")
 for i in $(seq 0 5);
 do
 echo "...Testing Default"
-python3 NDNsim.py -o "$METRICFILE" -tp "$TOPFILE" -w "$WEIGHTDIST" -r "$RANGE" -fd "$FAILDIST" -fr "$FAILRANGE" -pnco "$PHONE_NODE_CONNECT_ORDER" -v "$VELOCITY" -pgn "$PLTGEN_NUM" -pd "$PRECACHEDIST" -l "$LINGER" -d "$DELTA" -to "$TIMEOUT" -log "$LOGGING" -pt "$PHONE_TEST" -ipt "$IPERF_TEST"
+python3 NDNsim.py -ip "$IP" -port "$PORT" -pip "$PHONE_IP" -pport "$PHONE_PORT" -o "$METRICFILE" -tp "$TOPFILE" -w "$WEIGHTDIST" -r "$RANGE" -fd "$FAILDIST" -fr "$FAILRANGE" -pnco "$PHONE_NODE_CONNECT_ORDER" -v "$VELOCITY" -pgn "$PLTGEN_NUM" -pd "$PRECACHEDIST" -l "$LINGER" -d "$DELTA" -to "$TIMEOUT" -log "$LOGGING" -pt "$PHONE_TEST" -ipt "$IPERF_TEST"
 echo "..."
 done
 
 
 echo "--------------------TESTING UNIFORM WEIGHT 1-5--------------------"
+IP=("localhost")
+PORT=("8080")
+PHONE_IP=("192.168.1.207")
+PHONE_PORT=("9095")
 TOPFILE=("topology.txt")
 WEIGHTDIST=("uniform:0, 1" "uniform:0, 2" "uniform:0, 3" "uniform:0, 4" "uniform:0, 5")
 RANGE=("uniform:0, 2")
@@ -52,7 +60,7 @@ IPERF_TEST=("False")
 for i in $(seq 0 "$(("${#WEIGHTDIST[@]}"-1))");
 do
 echo "...Testing WEIGHTDIST: ${WEIGHTDIST[$i]}"
-python3 NDNsim.py -o "$METRICFILE" -tp "$TOPFILE" -w "${WEIGHTDIST[$i]}" -r "$RANGE" -fd "$FAILDIST" -fr "$FAILRANGE" -pnco "$PHONE_NODE_CONNECT_ORDER" -v "$VELOCITY" -pgn "$PLTGEN_NUM" -pd "$PRECACHEDIST" -l "$LINGER" -d "$DELTA" -to "$TIMEOUT" -log "$LOGGING" -pt "$PHONE_TEST" -ipt "$IPERF_TEST"
+python3 NDNsim.py -ip "$IP" -port "$PORT" -pip "$PHONE_IP" -pport "$PHONE_PORT" -o "$METRICFILE" -tp "$TOPFILE" -w "${WEIGHTDIST[$i]}" -r "$RANGE" -fd "$FAILDIST" -fr "$FAILRANGE" -pnco "$PHONE_NODE_CONNECT_ORDER" -v "$VELOCITY" -pgn "$PLTGEN_NUM" -pd "$PRECACHEDIST" -l "$LINGER" -d "$DELTA" -to "$TIMEOUT" -log "$LOGGING" -pt "$PHONE_TEST" -ipt "$IPERF_TEST"
 echo "..."
 done
 

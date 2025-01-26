@@ -103,20 +103,26 @@ python3 NDNsim.py -pt True
 
 Now, unless you are waiting for iperf3 to generate data, the text on the Android App should read "Connected". Now that it is connected, tap the "SEND INTEREST" button to begin the NDN simulator.
 
-Once the simulator is complete, you should see the requested data displayed on the phone screen. This may be dummy data (The numbers 1, 2, 3, 4, 5) or the generated iperf3 data.
+Once the simulator is complete, you should see the requested data displayed on the phone screen. This should be dummy data (The numbers 1, 2, 3, 4, 5) or the generated iperf3 data if the toggle was turned on `-ipt True`.
 
 ### Command Line Inputs
 
 The program NDNsim.py contains 16 arguments for the NDN simulator.
 
 | cmd line option    | Default	| Format | Description |
-| --- | ---- |  ----- |  --------- | 
-| -o,--outfile	| 'metric_outfile.csv'	| filename | Output file for simulation metrics. Appended to if exists already, creates if not. |
-| -tp,--topfile	| 'topology.txt'	| filename | The file to read in the topology of the NDN system. |
-| -w,--weights	| 'uniform:0, 1'	| distribution:distrubution values | The lambda_ values (aka transmission rates) for each link in the topology chosen from the given probability distribution. The default, "uniform:0, 1" means that each link has a transmission rate chosen by the uniform probability distrobution between 0-1 |
-| -r,--range	| 'uniform:0, 2'	| distribution:distrubution values | The probability distribution of each node's transmission range.Eg, the default: "uniform:0, 2" means that each node's transmission range is determined by the uniform probability distribution between 0 and 2. |
-| -fd,--failure_dist	| 'uniform:1, 1'	| distribution:distrubution values | The probability distribution for the probability that a packet will fail when sent to the next node. Eg, "uniform:0, 0.5" means that every time a packet is being sent to another node,	the possibility of it being sent is determined by the uniform probability distribution between 0 and 0.5. |
-| -fr,--failure_range	| '0, 0.1'	| lower bounds, upper bounds | The percentage (from x to y) for the probability that a packet will fail when sent to the next node.	Eg, "0.1, 0.5" means that every time a packet is being sent to another node,the possibility of it failing to be sent is between 10% and 50%."|
+| --------- | --------- | --------- |  --------- | 
+| -ip, --ip	| 'localhost'	| IP address | IP for the topology (computer simulated nodes). |
+| -port, --port	| '8080'	| port number | Starting port number for the topology (computer simulated nodes). |
+| -pip, --phone_ip	| '192.168.1.207'	| IP address | IP for the mobile consumer. |
+| -pport, --phone_port	| '9095'	| port number | Starting port number for the mobile consumer. |
+| -seed, --seed	| ''	| int seed | Seed for randomization for a controlled run. Will not effect thread behavior. Must be an int. |
+
+| -o, --outfile	| 'metric_outfile.csv'	| filename | Output file for simulation metrics. Appended to if exists already, creates if not. |
+| -tp, --topfile	| 'topology.txt'	| filename | The file to read in the topology of the NDN system. |
+| -w, --weights	| 'uniform:0, 1'	| distribution:distrubution values | The lambda_ values (aka transmission rates) for each link in the topology chosen from the given probability distribution. The default, "uniform:0, 1" means that each link has a transmission rate chosen by the uniform probability distrobution between 0-1 |
+| -r, --range	| 'uniform:0, 2'	| distribution:distrubution values | The probability distribution of each node's transmission range.Eg, the default: "uniform:0, 2" means that each node's transmission range is determined by the uniform probability distribution between 0 and 2. |
+| -fd, --failure_dist	| 'uniform:1, 1'	| distribution:distrubution values | The probability distribution for the probability that a packet will fail when sent to the next node. Eg, "uniform:0, 0.5" means that every time a packet is being sent to another node,	the possibility of it being sent is determined by the uniform probability distribution between 0 and 0.5. |
+| -fr, --failure_range	| '0, 0.1'	| lower bounds, upper bounds | The percentage (from x to y) for the probability that a packet will fail when sent to the next node.	Eg, "0.1, 0.5" means that every time a packet is being sent to another node,the possibility of it failing to be sent is between 10% and 50%."|
 | -pnco, --phone_node_connect_order	| '3:uniform:0, 8' | amount to generate: distribution: distrubution values | The probability distribution for the pattern in which the mobile consumer	will disconnect and re-connect to nodes in the topology.	Eg, the default: \"3:uniform:0, 8\" means that the phone will select the next node	to travel to by using the uniform probability distirbution between 0-8. It selects 3 times. |
 | -v, --velocity	| 'uniform:0, 2'	| distribution:distrubution values | The probability distribution of MC's velocity at each gateway connection. Eg, the default: "uniform:0, 2" means that at each node the mobile consumer is connecting to, they are travelling at a speed chosen by the uniform probability distribution between 0 and 2. |
 | -pgn, --pktgen_num	| 5	| number of packets to generate | When generating dummy data, determines how many data packets to generate. |
@@ -134,7 +140,7 @@ To run with default values, you can simply use:
 python3 NDNsim.py
 ```
 
-To run with command line inputs: 
+To run with all command line inputs: 
 
 ```
 python3 NDNsim.py -o "metric_outfile.csv" -tp "topology.txt" -w "uniform:0, 1" -r "uniform:0, 2" -fd "uniform:1, 1" -fr "0, 0.01" -pnco "3:uniform:0, 8" -v "uniform:0, 2" -pgn "5" -pd "uniform:0, 0.01" -l "uniform:0, 0.5" -d "3:uniform:0, 0.5" -to "5" -log "False" -pt "False" -ipt "False"

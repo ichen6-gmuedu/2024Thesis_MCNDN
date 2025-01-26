@@ -1,11 +1,33 @@
 #-------------------------------------------
 # IMPORTS
 
-import unittest, sys, logging, io
+import unittest, sys, logging, io, socket, pickle
 import numpy as np
-from threading import Lock
+from threading import Lock, Thread
 sys.path.insert(1, '../')
 import NDNsim
+
+#-------------------------------------------
+# FUNCTIONS
+
+#Generic socket code to receive 1 packet
+#NOT a unit test
+def generic_server(ip, port):
+	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # allows us to reuse socket for next run
+	s.bind((ip, port))
+	s.listen()
+	while True:
+		conn, addr = s.accept()
+		data = conn.recv(1024) # waits for data
+		packet = pickle.loads(data) # uses pickle format for sending/receiving
+		packet.print_info()
+		conn.close()
+		# Closes child threads if we're done
+		if packet.name.hierarchical_component == 'close':
+			break
+	s.shutdown(socket.SHUT_RDWR)
+	s.close()
 
 #-------------------------------------------
 # CLASS OBJECT TESTS
@@ -13,7 +35,7 @@ import NDNsim
 
 #-------------------------------------------------------------------------------
 class TestHybridName(unittest.TestCase): #Hybrid Name
-
+	print("WARNING! It is assumed for all objects and functions that the correct *type* of variable is passed in (ie. if a 'int' is expected, an 'int' is received, or if a list of packets it expected, a list of packets is received) and the correct values are passed in (ie. strings should be formatted correctly and numbers are logical).\n\n")
 	print("Starting Hybrid Name Tests")	
 	maxDiff = None
 	#-------------------------------------
@@ -360,7 +382,7 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 		sys.stdout = prev_stdout
 		
 		#Compare output
-		expected = 'No Hierarchical Name!'
+		expected = 'Cache Entry Info Start\nNo Hierarchical Name!\nCache Entry Info End'
 		self.assertEqual(output, expected)
 		
 	#-------------------------------------	
@@ -389,7 +411,7 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 		sys.stdout = prev_stdout
 		
 		#Compare output
-		expected = 'No Hierarchical Name!'
+		expected = 'Cache Entry Info Start\nNo Hierarchical Name!\nCache Entry Info End'
 		self.assertEqual(output, expected)
 
 	#-------------------------------------
@@ -422,8 +444,8 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 		sys.stdout = prev_stdout
 		
 		#Compare output
-		expected_1 = 'Hierarchical Name Info Start\nTask: newTask\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'No Hierarchical Name!\nTime packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_1 = 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: newTask\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = '\nPacket 0\nNo Hierarchical Name!\nTime packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\nCache Entry Info End'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		
@@ -440,11 +462,12 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 		sys.stdout = prev_stdout
 		
 		#Compare output
-		expected_1 = 'Hierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\n'
-		expected_2 = 'Hierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\nTime packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: 1.0\nDestination: 1\nPrecache: True\nNumber (for grouping): 1\n\n'
-		expected_3 = 'Hierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\nTime packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: 1.0\nDestination: 1\nPrecache: True\nNumber (for grouping): 1'
+		expected_1 = 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\n'
+		expected_2 = '\nPacket 0\nHierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\nTime packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: 1.0\nDestination: 1\nPrecache: True\nNumber (for grouping): 1\n'
+		expected_3 = '\nPacket 1\nHierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\nTime packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: 1.0\nDestination: 1\nPrecache: True\nNumber (for grouping): 1\nCache Entry Info End'
 		expected = expected_1 + expected_2 + expected_3
 		self.assertEqual(output, expected)
+		
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
@@ -536,12 +559,12 @@ class TestNode(unittest.TestCase): #Node
 		expected_1 = 'IP: 127.0.0.1\nPort: 9999\nNumber: -1\n'
 		expected_2 = 'Hierarchical Name Info Start\nTask: newTask\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
 		expected_3 = 'FIB: []\nWeights: []\n'
-		expected_4 = 'PIT: \nNo Hierarchical Name!\nTotal Counter: 0\nIncoming Interface: -1\n\n'
-		expected_5 = 'Cache: \nNo Hierarchical Name!\n\n'
+		expected_4 = 'PIT: \nPIT Entry 0:\nNo Hierarchical Name!\nTotal Counter: 0\nIncoming Interface: -1\n\n'
+		expected_5 = 'Cache: \nCache Entry Info Start\nNo Hierarchical Name!\nCache Entry Info End\n'
 		expected_6 = 'Transmission Range: -1.0'
 		expected = expected_1 + expected_2 + expected_3 + expected_4 + expected_5 + expected_6
 		self.assertEqual(output, expected)
-		
+	
 		#Redirect STD
 		prev_stdout = sys.stdout
 		out = io.StringIO()
@@ -562,7 +585,8 @@ class TestNode(unittest.TestCase): #Node
 		expected_5 = 'Cache: \n'
 		expected_6 = 'Transmission Range: -1.0'
 		expected = expected_1 + expected_2 + expected_3 + expected_4 + expected_5 + expected_6
-		self.assertEqual(output, expected)		
+		self.assertEqual(output, expected)	
+
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
@@ -598,9 +622,9 @@ class TestTopology(unittest.TestCase): #Node
 		expected_2 = "Weight Dist:  ['uniform', '0, 1']\n"
 		expected_3 = "Transmission Range Dist:  ['uniform', '0, 8']\n"
 		expected_4 = 'Nodes: \n'
-		node_1 = "IP: localhost\nPort: 8080\nNumber: 0\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/Safeway\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [0, np.float64(0.417022004702574), -1]\nPIT: \nCache: \nTransmission Range: 5.762595947537265\n\n"
-		node_2 = "IP: localhost\nPort: 8081\nNumber: 1\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/GMU/EEC\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['VA/Fairfax/Safeway', '0', 'VA/Fairfax/GMU/CS']\nWeights: [np.float64(0.417022004702574), 0, np.float64(0.30233257263183977)]\nPIT: \nCache: \nTransmission Range: 1.1740471265369044\n\n"
-		node_3 = "IP: localhost\nPort: 8082\nNumber: 2\nHierarchical Name Info Start\nTask: \nDevice Name: 1R153AN\nData Hash: Irisean\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN|Irisean\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [-1, np.float64(0.30233257263183977), 0]\nPIT: \nCache: \nTransmission Range: 1.4900816910213672\n\n"
+		node_1 = "IP: 127.0.0.1\nPort: 9999\nNumber: 0\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/Safeway\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [0, np.float64(0.417022004702574), -1]\nPIT: \nCache: \nTransmission Range: 5.762595947537265\n\n"
+		node_2 = "IP: 127.0.0.1\nPort: 10000\nNumber: 1\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/GMU/EEC\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['VA/Fairfax/Safeway', '0', 'VA/Fairfax/GMU/CS']\nWeights: [np.float64(0.417022004702574), 0, np.float64(0.30233257263183977)]\nPIT: \nCache: \nTransmission Range: 1.1740471265369044\n\n"
+		node_3 = "IP: 127.0.0.1\nPort: 10001\nNumber: 2\nHierarchical Name Info Start\nTask: \nDevice Name: 1R153AN\nData Hash: Irisean\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN|Irisean\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [-1, np.float64(0.30233257263183977), 0]\nPIT: \nCache: \nTransmission Range: 1.4900816910213672\n\n"
 		expected_5 = "Weights:  [[0, np.float64(0.417022004702574), -1], [np.float64(0.417022004702574), 0, np.float64(0.30233257263183977)], [-1, np.float64(0.30233257263183977), 0]]\n"
 		expected_6 = "FIB:  [['0', 'VA/Fairfax/GMU/EEC', '0'], ['VA/Fairfax/Safeway', '0', 'VA/Fairfax/GMU/CS'], ['0', 'VA/Fairfax/GMU/EEC', '0']]"
 		expected = expected_1 + expected_2 + expected_3 + expected_4 + node_1 + node_2 + node_3 + expected_5 + expected_6
@@ -637,9 +661,9 @@ class TestTopology(unittest.TestCase): #Node
 		expected_2 = "Weight Dist:  ['uniform', '0, 1']\n"
 		expected_3 = "Transmission Range Dist:  ['uniform', '0, 8']\n"
 		expected_4 = 'Nodes: \n'
-		node_1 = "IP: localhost\nPort: 8080\nNumber: 0\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/Safeway\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [0, np.float64(0.417022004702574), -1]\nPIT: \nCache: \nTransmission Range: 5.762595947537265\n\n"
-		node_2 = "IP: localhost\nPort: 8081\nNumber: 1\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/GMU/EEC\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['VA/Fairfax/Safeway', '0', 'VA/Fairfax/GMU/CS']\nWeights: [np.float64(0.417022004702574), 0, np.float64(0.30233257263183977)]\nPIT: \nCache: \nTransmission Range: 1.1740471265369044\n\n"
-		node_3 = "IP: localhost\nPort: 8082\nNumber: 2\nHierarchical Name Info Start\nTask: \nDevice Name: 1R153AN\nData Hash: Irisean\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN|Irisean\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [-1, np.float64(0.30233257263183977), 0]\nPIT: \nCache: \nTransmission Range: 1.4900816910213672\n\n"
+		node_1 = "IP: 127.0.0.1\nPort: 9999\nNumber: 0\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/Safeway\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [0, np.float64(0.417022004702574), -1]\nPIT: \nCache: \nTransmission Range: 5.762595947537265\n\n"
+		node_2 = "IP: 127.0.0.1\nPort: 10000\nNumber: 1\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/GMU/EEC\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['VA/Fairfax/Safeway', '0', 'VA/Fairfax/GMU/CS']\nWeights: [np.float64(0.417022004702574), 0, np.float64(0.30233257263183977)]\nPIT: \nCache: \nTransmission Range: 1.1740471265369044\n\n"
+		node_3 = "IP: 127.0.0.1\nPort: 10001\nNumber: 2\nHierarchical Name Info Start\nTask: \nDevice Name: 1R153AN\nData Hash: Irisean\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN|Irisean\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [-1, np.float64(0.30233257263183977), 0]\nPIT: \nCache: \nTransmission Range: 1.4900816910213672\n\n"
 		expected_5 = "Weights:  [[0, np.float64(0.417022004702574), -1], [np.float64(0.417022004702574), 0, np.float64(0.30233257263183977)], [-1, np.float64(0.30233257263183977), 0]]\n"
 		expected_6 = "FIB:  [['0', 'VA/Fairfax/GMU/EEC', '0'], ['VA/Fairfax/Safeway', '0', 'VA/Fairfax/GMU/CS'], ['0', 'VA/Fairfax/GMU/EEC', '0']]"
 		expected = expected_1 + expected_2 + expected_3 + expected_4 + node_1 + node_2 + node_3 + expected_5 + expected_6
@@ -706,9 +730,9 @@ class TestTopology(unittest.TestCase): #Node
 		expected_2 = "Weight Dist:  ['uniform', '0, 1']\n"
 		expected_3 = "Transmission Range Dist:  ['uniform', '0, 8']\n"
 		expected_4 = 'Nodes: \n'
-		node_1 = "IP: localhost\nPort: 8080\nNumber: 0\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/Safeway\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [0, np.float64(0.34556072704304774), -1]\nPIT: \nCache: \nTransmission Range: 3.1741397938453595\n\n"
-		node_2 = "IP: localhost\nPort: 8081\nNumber: 1\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/GMU/EEC\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['VA/Fairfax/Safeway', '0', 'VA/Fairfax/GMU/CS']\nWeights: [np.float64(0.34556072704304774), 0, np.float64(0.4191945144032948)]\nPIT: \nCache: \nTransmission Range: 5.481756003174076\n\n"
-		node_3 = "IP: localhost\nPort: 8082\nNumber: 2\nHierarchical Name Info Start\nTask: \nDevice Name: 1R153AN\nData Hash: Irisean\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN|Irisean\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [-1, np.float64(0.4191945144032948), 0]\nPIT: \nCache: \nTransmission Range: 7.024939491127563\n\n"
+		node_1 = "IP: 127.0.0.1\nPort: 9999\nNumber: 0\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/Safeway\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [0, np.float64(0.34556072704304774), -1]\nPIT: \nCache: \nTransmission Range: 3.1741397938453595\n\n"
+		node_2 = "IP: 127.0.0.1\nPort: 10000\nNumber: 1\nHierarchical Name Info Start\nTask: \nDevice Name: xxx\nData Hash: yyy\nHierarchical Component: VA/Fairfax/GMU/EEC\nFlat Component: xxx|yyy\nHierarchical Name Info End\nFIB: ['VA/Fairfax/Safeway', '0', 'VA/Fairfax/GMU/CS']\nWeights: [np.float64(0.34556072704304774), 0, np.float64(0.4191945144032948)]\nPIT: \nCache: \nTransmission Range: 5.481756003174076\n\n"
+		node_3 = "IP: 127.0.0.1\nPort: 10001\nNumber: 2\nHierarchical Name Info Start\nTask: \nDevice Name: 1R153AN\nData Hash: Irisean\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN|Irisean\nHierarchical Name Info End\nFIB: ['0', 'VA/Fairfax/GMU/EEC', '0']\nWeights: [-1, np.float64(0.4191945144032948), 0]\nPIT: \nCache: \nTransmission Range: 7.024939491127563\n\n"
 		expected_5 = "Weights:  [[0, np.float64(0.34556072704304774), -1], [np.float64(0.34556072704304774), 0, np.float64(0.4191945144032948)], [-1, np.float64(0.4191945144032948), 0]]\n"
 		expected_6 = "FIB:  [['0', 'VA/Fairfax/GMU/EEC', '0'], ['VA/Fairfax/Safeway', '0', 'VA/Fairfax/GMU/CS'], ['0', 'VA/Fairfax/GMU/EEC', '0']]"
 		expected = expected_1 + expected_2 + expected_3 + expected_4 + node_1 + node_2 + node_3 + expected_5 + expected_6
@@ -861,31 +885,7 @@ class TestDistributionHelper(unittest.TestCase): #distribution_helper
 		self.assertEqual(output, 1)		
 		
 	#-------------------------------------
-	#Assertion checks - uniform min > max (27)
-	#-------------------------------------
-	def test_uniform_assertion(self):
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.distribution_helper("uniform", [1, 0], True)	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Maximum value larger than minimum value")		
-		
-	#-------------------------------------
-	#Gaussian/normal random number check (28)
+	#Gaussian/normal random number check (27)
 	#-------------------------------------	
 	def test_gaussian_random_number(self):
 		#Setting seeds for distribution
@@ -895,7 +895,7 @@ class TestDistributionHelper(unittest.TestCase): #distribution_helper
 		self.assertEqual(output, np.float64(1.6243453636632417))
 		
 	#-------------------------------------
-	#Gaussian/normal cdf check (29)
+	#Gaussian/normal cdf check (28)
 	#-------------------------------------	
 	def test_gaussian_cdf(self):
 		#Setting seeds for distribution
@@ -905,7 +905,7 @@ class TestDistributionHelper(unittest.TestCase): #distribution_helper
 		self.assertEqual(output, np.float64(0.9478489396588523))
 		
 	#-------------------------------------
-	#Gaussian/normal random number check if std = 0 (30)
+	#Gaussian/normal random number check if std = 0 (29)
 	#-------------------------------------	
 	def test_gaussian_random_number_std_0(self):
 		#Setting seeds for distribution
@@ -915,7 +915,7 @@ class TestDistributionHelper(unittest.TestCase): #distribution_helper
 		self.assertEqual(output, 0)
 		
 	#-------------------------------------
-	#Gaussian/normal cdf check if std = 0 (31)
+	#Gaussian/normal cdf check if std = 0 (30)
 	#-------------------------------------	
 	def test_gaussian_cdf_std_0(self):
 		#Setting seeds for distribution
@@ -925,7 +925,7 @@ class TestDistributionHelper(unittest.TestCase): #distribution_helper
 		self.assertEqual(output, 1)		
 		
 	#-------------------------------------
-	#Zipf random number check (32)
+	#Zipf random number check (31)
 	#-------------------------------------	
 	def test_zipf_random_number(self):
 		#Setting seeds for distribution
@@ -935,7 +935,7 @@ class TestDistributionHelper(unittest.TestCase): #distribution_helper
 		self.assertEqual(output, 1)
 		
 	#-------------------------------------
-	#Zipf cdf check (33)
+	#Zipf cdf check (32)
 	#-------------------------------------	
 	def test_zipf_cdf(self):
 		#Setting seeds for distribution
@@ -945,179 +945,7 @@ class TestDistributionHelper(unittest.TestCase): #distribution_helper
 		self.assertEqual(output, np.float64(0.6079271018540265))
 		
 	#-------------------------------------
-	#Assertion checks - a > 1 (34)
-	#-------------------------------------
-	def test_zipf_assertion(self):
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.distribution_helper("zipf", [1], True)	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! a must be greater than 1")		
-				
-	#-------------------------------------
-	#Assertion checks - negative values (35)
-	#-------------------------------------
-	def test_negative_assertion(self):
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.distribution_helper("uniform", [-1, 0], True)	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! One or more values is negative")	
-		
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.distribution_helper("uniform", [0, -1], True)	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! One or more values is negative")		
-		
-	#-------------------------------------
-	#Assertion checks - wrong number of values (36)
-	#-------------------------------------		
-	def test_incorrect_assertion(self):
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.distribution_helper("uniform", [0], True)	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Values must be a list of len 2 for uniform or gaussian distribution")			
-		
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.distribution_helper("gaussian", [0, 0, 2], True)	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Values must be a list of len 2 for uniform or gaussian distribution")	
-		
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.distribution_helper("normal", [], True)	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Values must be a list of len 2 for uniform or gaussian distribution")		
-		
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.distribution_helper("zipf", [1, 0], True)	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Values must be a list of len 1 for zipf")	
-		
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.distribution_helper("zipf", [], True)	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Values must be a list of len 1 for zipf")						
-
-	#-------------------------------------
-	#Assertion checks - unknown distribution (37)
+	#Assertion checks - unknown distribution (33)
 	#-------------------------------------	
 	def test_unknown_assertion(self):		
 		#Setting seeds for distribution
@@ -1147,7 +975,7 @@ class TestGeneratePackets(unittest.TestCase): #generate_packets
 	print("Starting Generate Packets Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Generate 0 packets (38)
+	#Generate 0 packets (34)
 	#-------------------------------------
 	def test_generate_0_packet(self):
 		packet = NDNsim.Packet()
@@ -1156,7 +984,7 @@ class TestGeneratePackets(unittest.TestCase): #generate_packets
 		self.assertEqual(total_size, 0)
 		
 	#-------------------------------------
-	#Generate 1 packet (39)
+	#Generate 1 packet (35)
 	#-------------------------------------
 	def test_generate_1_packet(self):
 		packet = NDNsim.Packet()
@@ -1185,7 +1013,7 @@ class TestGeneratePackets(unittest.TestCase): #generate_packets
 		self.assertEqual(total_size, 1)
 		
 	#-------------------------------------
-	#Generate 1 packet with a name (40)
+	#Generate 1 packet with a name (36)
 	#-------------------------------------
 	def test_generate_1_name_packet(self):
 		packet = NDNsim.Packet()
@@ -1215,7 +1043,7 @@ class TestGeneratePackets(unittest.TestCase): #generate_packets
 		self.assertEqual(total_size, 1)		
 	
 	#-------------------------------------
-	#Generate 10 packets (41)
+	#Generate 15 packets (37)
 	#-------------------------------------	
 	def test_generate_15_packets(self):
 	
@@ -1252,7 +1080,7 @@ class TestGeneratePackets(unittest.TestCase): #generate_packets
 		self.assertEqual(total_size, size)	
 		
 	#-------------------------------------
-	#Generate packets according to iperf (42)
+	#Generate packets according to iperf (38)
 	#-------------------------------------
 	def test_iperf3_generation(self):
 		iperf_string = """Client: Connecting to host localhost, port 5201
@@ -1319,7 +1147,7 @@ iperf Done.
 		self.assertEqual(total_size, size)
 		
 	#-------------------------------------
-	#Generate packets according to iperf with a name (43)
+	#Generate packets according to iperf with a name (39)
 	#-------------------------------------
 	def test_iperf3_name_generation(self):
 		iperf_string = """Client: Connecting to host localhost, port 5201
@@ -1393,48 +1221,48 @@ class TestNextGateway(unittest.TestCase): #next_gateway
 	print("Starting Next Gateway Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Tests the next gateway for an empty list (44)
+	#Tests the next gateway for an empty list (40)
 	#-------------------------------------
 	def test_next_empty_list(self):
 		#Init globals
 		NDNsim.phone_node_connect_order_counter = 0
-		phone_node_connect_order_counter_lock = Lock()
+		NDNsim.phone_node_connect_order_counter_lock = Lock()
 		
 		output = NDNsim.next_gateway(NDNsim.Node(), 0.0, [])
 		self.assertEqual(NDNsim.phone_node_connect_order_counter, 1)
 		self.assertEqual(output, -1)
 
 	#-------------------------------------
-	#Tests the next gateway for a 2 sized list (45)
+	#Tests the next gateway for a 2 sized list (41)
 	#-------------------------------------	
 	def test_next_2_item_list(self):
 		#Init globals
 		NDNsim.phone_node_connect_order_counter = 0
-		phone_node_connect_order_counter_lock = Lock()
+		NDNsim.phone_node_connect_order_counter_lock = Lock()
 		
 		output = NDNsim.next_gateway(NDNsim.Node(), 0.0, [1, 2])
 		self.assertEqual(NDNsim.phone_node_connect_order_counter, 1)
 		self.assertEqual(output, 2)
 		
 	#-------------------------------------
-	#Tests the next gateway for the end of the list (46)
+	#Tests the next gateway for the end of the list (42)
 	#-------------------------------------		
 	def test_next_end_of_list(self):
 		#Init globals
 		NDNsim.phone_node_connect_order_counter = 0
-		phone_node_connect_order_counter_lock = Lock()
+		NDNsim.phone_node_connect_order_counter_lock = Lock()
 		
 		output = NDNsim.next_gateway(NDNsim.Node(), 0.0, [1])
 		self.assertEqual(NDNsim.phone_node_connect_order_counter, 1)
 		self.assertEqual(output, -1)
 	
 	#-------------------------------------
-	#Tests the next gateway for a 5 sized list (47)
+	#Tests the next gateway for a 5 sized list (43)
 	#-------------------------------------		
 	def test_next_complete_test(self):
 		#Init globals
 		NDNsim.phone_node_connect_order_counter = 0
-		phone_node_connect_order_counter_lock = Lock()
+		NDNsim.phone_node_connect_order_counter_lock = Lock()
 		
 		for x in range(5):
 			output = NDNsim.next_gateway(NDNsim.Node(), 0.0, [1, 2, 3, 4, 5])
@@ -1452,7 +1280,7 @@ class TestCalcLinger(unittest.TestCase): #calc_linger
 	print("Starting Calc Linger Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Tests the function (most work is done by distribution helper) (48)
+	#Tests the function (most work is done by distribution helper) (44)
 	#-------------------------------------
 	def test_calc_linger_getValue(self):
 		#Setting seeds for distribution
@@ -1461,181 +1289,25 @@ class TestCalcLinger(unittest.TestCase): #calc_linger
 		output = NDNsim.calc_linger(0.0, 0.0, ["uniform", "0, 2"])
 		self.assertEqual(output, np.float64(0.834044009405148))
 		
-	#-------------------------------------
-	#Assertion check - not numbers (49)
-	#-------------------------------------
-	def test_calc_linger_assertion(self):
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.calc_linger(0.0, 0.0, ["uniform", "a, 2"])	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Value(s) in: a, 2 must be numbers")
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.calc_linger(0.0, 0.0, ["uniform", "1, b"])	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Value(s) in: 1, b must be numbers")
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.calc_linger(0.0, 0.0, ["zipf", "a"])	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Value(s) in: a must be numbers")
 #-------------------------------------------------------------------------------	
 
 #-------------------------------------------------------------------------------
-class TestSplitDistString(unittest.TestCase): #split_dist_string
+class TestSplitDistString(unittest.TestCase): #gen_N_random_values
 
-	print("Starting Split Dist String Tests")	
+	print("Starting Gen N Random Values Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Tests the function (most work is done by distribution helper) (50)
+	#Tests the function (most work is done by distribution helper) (45)
 	#-------------------------------------
-	def test_split_dist_get_value(self):
+	def test_gen_N_get_value(self):
 		#Setting seeds for distribution
 		np.random.seed(seed=1)
 		
-		output = NDNsim.split_dist_string("3:uniform:0, 8")
+		output = NDNsim.gen_N_random_values("3:uniform:0, 8")
 		expected = [np.float64(3.336176037620592), np.float64(5.762595947537265), np.float64(0.0009149985387590931)]
 		for x in range(len(output)):
 			self.assertEqual(output[x], expected[x])
 		
-	#-------------------------------------
-	#Tests the formatting to see if 3 values (51)
-	#-------------------------------------
-	def test_split_dist_assertion_1(self):
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.split_dist_string("3:uniform")
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Problem formatting string: 3:uniform")	
-		
-	#-------------------------------------
-	#Tests the formatting to see if first value is int (52)
-	#-------------------------------------
-	def test_split_dist_assertion_2(self):
-		#Setting seeds for distribution
-		np.random.seed(seed=1)
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.split_dist_string("a:uniform:0, 8")
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! First value in string: a:uniform:0, 8 must be an int")	
-
-	#-------------------------------------
-	#Tests the formatting to see if 3rd values are numbers (53)
-	#-------------------------------------	
-	def test_split_dist_assertion_3(self):
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.split_dist_string("1:uniform:a, 2")
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Value(s) in: a, 2 must be numbers")
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.split_dist_string("1:uniform:1, b")	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Value(s) in: 1, b must be numbers")
-		
-		#Redirect STD
-		prev_stdout = sys.stdout
-		out = io.StringIO()
-		sys.stdout = out
-		
-		with self.assertRaises(SystemExit) as cm:
-			output = NDNsim.split_dist_string("1:zipf:a")	
-		
-		self.assertEqual(cm.exception.code, 1)
-		
-		#Capture print
-		output = out.getvalue().rstrip()
-		
-		#Redirect STD
-		sys.stdout = prev_stdout
-		self.assertEqual(output, "Error! Value(s) in: a must be numbers")		
 #-------------------------------------------------------------------------------	
 
 #-------------------------------------------------------------------------------
@@ -1644,116 +1316,1023 @@ class TestDijkstras(unittest.TestCase): #dijkstras
 	print("Starting Dijkstras Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Checks for a simple line topology
+	#Checks for a triangle topology with unequal weights (46)
 	#-------------------------------------
-	def test_1_node_topology(self):
-		topology = NDNsim.Topology('./topologies/small_topology.txt')
-		topology.print_info()
-		#only need to modifiy 'weights'
-	
-	def test_2_node_topology(self):
-		pass
-	def test_5_node_topology(self):
-		pass
-	def test_50_node_topology(self):
-		pass
-	def test_same_weights(self):
-		pass
-	def test_varying_weights(self):
-		pass
-	
-#-------------------------------------------------------------------------------	
-'''	
-#-------------------------------------------------------------------------------
-class TestSocketCode(unittest.TestCase): #socket_code
+	def test_dijkstras_triangle_longest_path(self):
+		#Right triangle, index 0 is top, index 1 is 90 corner, index 2 is other 
+		weights = [[0, 1, .001], [1, 0, 1], [.001, 1, 0]]
+		shortest_path, weight, next_hop = NDNsim.dijkstras(0, 2, weights)
+		self.assertEqual(shortest_path, [0, 1, 2])
+		self.assertEqual(weight, 2)
+		self.assertEqual(next_hop, 1)
 
-	print("Starting Socket Code Tests")	
-	maxDiff = None
 	#-------------------------------------
-	
-	def test_connection(self):
-	
-#-------------------------------------------------------------------------------	
-	
-#-------------------------------------------------------------------------------
-class TestPrecacheHelper(unittest.TestCase): #precache_helper
+	#Checks for a triangle topology with equal weights (47)
+	#-------------------------------------
+	def test_dijkstras_triangle_same_weights(self):
+		#Right triangle, index 0 is top, index 1 is 90 corner, index 2 is other 
+		weights = [[0, 1, 1], [1, 0, 1], [1, 1, 0]]
+		shortest_path, weight, next_hop = NDNsim.dijkstras(0, 2, weights)
+		self.assertEqual(shortest_path, [0, 2])
+		self.assertEqual(weight, 1)
+		self.assertEqual(next_hop, 2)
 
-	print("Starting Distribution Helper Tests")	
-	maxDiff = None
 	#-------------------------------------
-	
-	def test_SendViaInfrastructure(self):
-	def test_SendViaTopology(self):
+	#Checks for starting at the end (48)
+	#-------------------------------------		
+	def test_dijkstras_triangle_start_at_end(self):
+		#Right triangle, index 0 is top, index 1 is 90 corner, index 2 is other 
+		weights = [[0, 1, 1], [1, 0, 1], [1, 1, 0]]
+		shortest_path, weight, next_hop = NDNsim.dijkstras(0, 0, weights)
+		self.assertEqual(shortest_path, [0, 0])
+		self.assertEqual(weight, 0)
+		self.assertEqual(next_hop, 0)
+
+	#-------------------------------------
+	#Checks for equal paths (49)
+	#-------------------------------------		
+	def test_dijkstras_equal_paths(self):
+		#4 point circle - 0 is south, 1 is west, 2 is north, 3 is east 
+		weights = [[0, 1, -1, 1], [1, 0, 1, -1], [-1, 1, 0, 1], [1, -1, 1, 0]]
+		shortest_path, weight, next_hop = NDNsim.dijkstras(0, 2, weights)
+		self.assertEqual(shortest_path, [0, 1, 2])
+		self.assertEqual(weight, 2)
+		self.assertEqual(next_hop, 1)
 		
-#-------------------------------------------------------------------------------	
+	#-------------------------------------
+	#Checks for full_topology, assuming all weights are equal (50)
+	#-------------------------------------		
+	def test_dijkstras_full_topology(self):
+		#Object 1
+		Topology_1 = NDNsim.Topology('./topologies/full_topology.txt')
+		weights = []
+		for x in range(len(Topology_1.weights)):
+			temp_weights = []
+			for y in range(len(Topology_1.weights[x])):
+				if Topology_1.weights[x][y] == 0 or Topology_1.weights[x][y] == -1:
+					temp_weights.append(Topology_1.weights[x][y])
+				else:
+					temp_weights.append(1)
+			weights.append(temp_weights)
+		shortest_path, weight, next_hop = NDNsim.dijkstras(4, 2, weights)
+		self.assertEqual(shortest_path, [4, 1, 2])
+		self.assertEqual(weight, 2)
+		self.assertEqual(next_hop, 1)
 	
+#-------------------------------------------------------------------------------	
+
 #-------------------------------------------------------------------------------
+class TestPrecacheHelper(unittest.TestCase): #precache_packet_helper
 
-class TestServiceConnection(unittest.TestCase): #service_connection
-
-	print("Starting Distribution Helper Tests")	
+	print("Starting Precache Packet Helper Tests")	
 	maxDiff = None
 	#-------------------------------------
-	
-	def test_TestOrClose(self):
-	# interest packet
-	def test_MissingCacheData(self):
-	def test_CacheEntryMatch(self):
-	def test_CacheHit(self):
-	def test_ReachedProducer(self):
-	def test_FIB_Forwarding(self):
-	def test_InterestCollapse(self):
-	# data packet	
-	def test_Precache_Forwarding(self):
-	def test_PIT_Forwarding(self):
-	def test_ClearPIT(self):
-	def test_CreateNewCacheEntry(self):
-	def test_AddToExistingCache(self):
-	def test_SatisfyInterestCollapse(self):
+	#Checks if at last node in order (51)
+	#-------------------------------------	
+	def test_precache_no_next_node(self):
+		#Init globals
+		NDNsim.logging = True
+		NDNsim.num_pro_del = 0
+		NDNsim.num_pro_del_lock = Lock()
+		NDNsim.num_infrastructure = 0
+		NDNsim.num_infrastructure_lock = Lock()
+		NDNsim.phone_node_connect_order_counter = 2
+		NDNsim.phone_node_connect_order_counter_lock = Lock()
+		NDNsim.global_topology = NDNsim.Topology('./topologies/full_topology.txt')
+		
+		#Init values for function
+		node = NDNsim.global_topology.nodes[0] #node 0 in the topology
+		packet = NDNsim.Packet()
+		new_packets = []
+		precache_dist = ["uniform","0, 1"]
+		failure_range = "50, 50"
+		phone_node_connect_order = [0, 1, 2]
+		for x in range(5):
+			new_packets.append(NDNsim.Packet())
+		
+		#Setting seeds for distribution
+		np.random.seed(seed=1)
+		
+		packets_to_append, nodes_to_append, ret_Fail = NDNsim.precache_packet_helper("cache", node, packet, new_packets, precache_dist, failure_range, phone_node_connect_order)
+		self.assertEqual(NDNsim.num_pro_del, 0)
+		self.assertEqual(NDNsim.num_infrastructure, 0)
+		self.assertEqual(packets_to_append, [])
+		self.assertEqual(nodes_to_append, [])
+		self.assertEqual(ret_Fail, True)
 
-	
-#-------------------------------------------------------------------------------	
-	
-#-------------------------------------------------------------------------------
-
-class TestReadargs(unittest.TestCase): #readargs
-
-	print("Starting Readargs Tests")	
-	maxDiff = None
 	#-------------------------------------
+	#Checks if send thru infrastructure (52)
+	#-------------------------------------		
+	def test_precache_send_via_infrastructure(self):
+		#Init globals
+		NDNsim.logging = True
+		NDNsim.num_pro_del = 0
+		NDNsim.num_pro_del_lock = Lock()
+		NDNsim.num_infrastructure = 0
+		NDNsim.num_infrastructure_lock = Lock()
+		NDNsim.phone_node_connect_order_counter = 0
+		NDNsim.phone_node_connect_order_counter_lock = Lock()
+		NDNsim.global_topology = NDNsim.Topology('./topologies/full_topology.txt')
+		
+		#Init values for function
+		node = NDNsim.global_topology.nodes[0] #node 0 in the topology
+		packet = NDNsim.Packet()
+		new_packets = []
+		precache_dist = ["uniform","0, 1"]
+		failure_range = "1, 1"
+		phone_node_connect_order = [0, 2]
+		for x in range(5):
+			new_packets.append(NDNsim.Packet())
+		
+		#Setting seeds for distribution
+		np.random.seed(seed=1)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		packets_to_append, nodes_to_append, ret_Fail = NDNsim.precache_packet_helper("cache", node, packet, new_packets, precache_dist, failure_range, phone_node_connect_order)
+		output = out.getvalue().rstrip()
 	
-	def test_CorrectArgs(self):
-
+		#Redirect STD
+		sys.stdout = prev_stdout
+		
+		expected_1 = 'No Hierarchical Name!\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: 2\nPrecache: True\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, ("Expected link failure! Sending via Infrastructure!\nPrecaching from cache!"))
+		self.assertEqual(NDNsim.num_pro_del, 1)
+		self.assertEqual(NDNsim.num_infrastructure, 1)
+		for x in range(len(packets_to_append)):
+			#Redirect STD
+			prev_stdout = sys.stdout
+			out = io.StringIO()
+			sys.stdout = out
+			
+			packets_to_append[x].print_info()
+			output = out.getvalue().rstrip()
+		
+			#Redirect STD
+			sys.stdout = prev_stdout		
+		
+			self.assertEqual(output, expected)
+			self.assertEqual(nodes_to_append[x], 2)
+		self.assertEqual(ret_Fail, False)
+		
+	#-------------------------------------
+	#Checks if send thru topology (53)
+	#-------------------------------------		
+	def test_precache_send_via_topology(self):
+		#Init globals
+		NDNsim.logging = True
+		NDNsim.num_pro_del = 0
+		NDNsim.num_pro_del_lock = Lock()		
+		NDNsim.num_infrastructure = 0
+		NDNsim.num_infrastructure_lock = Lock()
+		NDNsim.phone_node_connect_order_counter = 0
+		NDNsim.phone_node_connect_order_counter_lock = Lock()
+		NDNsim.global_topology = NDNsim.Topology('./topologies/full_topology.txt')
+		
+		#Init values for function
+		node = NDNsim.global_topology.nodes[0] #node 0 in the topology
+		packet = NDNsim.Packet()
+		new_packets = []
+		precache_dist = ["uniform","0, 1"]
+		failure_range = "0, 0"
+		phone_node_connect_order = [0, 2]
+		for x in range(5):
+			new_packets.append(NDNsim.Packet())
+		
+		#Setting seeds for distribution
+		np.random.seed(seed=1)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		packets_to_append, nodes_to_append, ret_Fail = NDNsim.precache_packet_helper("producer", node, packet, new_packets, precache_dist, failure_range, phone_node_connect_order)
+		output = out.getvalue().rstrip()
+	
+		#Redirect STD
+		sys.stdout = prev_stdout
+		
+		expected_1 = 'No Hierarchical Name!\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: 2\nPrecache: True\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, ("Precaching from producer!"))
+		self.assertEqual(NDNsim.num_pro_del, 1)
+		self.assertEqual(NDNsim.num_infrastructure, 0)
+		for x in range(len(packets_to_append)):
+			#Redirect STD
+			prev_stdout = sys.stdout
+			out = io.StringIO()
+			sys.stdout = out
+			
+			packets_to_append[x].print_info()
+			output = out.getvalue().rstrip()
+		
+			#Redirect STD
+			sys.stdout = prev_stdout		
+		
+			self.assertEqual(output, expected)
+			self.assertEqual(nodes_to_append[x], 1)
+		self.assertEqual(ret_Fail, True)
 #-------------------------------------------------------------------------------	
 
 #-------------------------------------------------------------------------------
-class TestSendPacket(unittest.TestCase): #send_packet TODO Mayebe
-
+class TestSendPacket(unittest.TestCase): #send_packet
+	
 	print("Starting Send Packet Tests")	
 	maxDiff = None
 	#-------------------------------------
+	#Checks if a packet can be sent using function and received via generic server code (54)
+	#-------------------------------------	
+	def test_send_1_packet(self):
+		#Init globals
+		NDNsim.num_failure = 0
+		NDNsim.num_failure_lock = Lock()	
+		
+		#Socker config
+		ip = 'localhost'
+		src_port = 8080
+		dest_port = 8081
+		
+		#Start the server
+		t1 = Thread(target=generic_server, args=[ip, dest_port])
+		t1.start()
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		#Send a packet
+		packet = NDNsim.Packet()
+		packet.name = NDNsim.Hybrid_Name(hierarchical_component = 'close')
+		NDNsim.send_packet(ip, src_port, dest_port, packet, False, "0, 0", ["uniform", "0, 0.5"])
+		t1.join()
+		
+		#Grab print
+		output = out.getvalue().rstrip()
 	
-	def test_linkfailure(self):
-	def test_send_one_packet(self):
-	def test_send_5_packets(self):
-	def test_send_50_packets(self):
-#-------------------------------------------------------------------------------	
+		#Redirect STD
+		sys.stdout = prev_stdout		
 	
-#-------------------------------------------------------------------------------
-class TestCloseThreads(unittest.TestCase): #close_threads TODO Mayebe
+		#Check value
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: close\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(NDNsim.num_failure, 0)
 
-	print("Starting Close Threads Tests")	
+	#-------------------------------------
+	#Checks if 5 packets can be sent using function and received via generic server code (55)
+	#-------------------------------------		
+	def test_send_5_packets(self):
+		#Init globals
+		NDNsim.num_failure = 0
+		NDNsim.num_failure_lock = Lock()	
+		
+		#Socker config
+		ip = 'localhost'
+		src_port = 8080
+		dest_port = 8081
+		
+		#Start the server
+		t1 = Thread(target=generic_server, args=[ip, dest_port])
+		t1.start()
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		#Send a packet
+		expected = ''
+		for x in range(5):
+			packet = NDNsim.Packet(payload = str(x))
+			packet.name = NDNsim.Hybrid_Name()
+			if x != 4:
+				packet.name.hierarchical_component = 'VA/Fairfax/GMU/CS'
+				expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			else:
+				packet.name.hierarchical_component = 'close'
+				expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: close\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: ' + str(x) + '\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			expected = expected + expected_1 + expected_2 + "\n"
+			NDNsim.send_packet(ip, src_port, dest_port, packet, False, "0, 0", ["uniform", "0, 0.5"])
+		t1.join()
+		
+		#Grab print
+		output = out.getvalue().rstrip()
+	
+		#Redirect STD
+		sys.stdout = prev_stdout		
+	
+		#Check value
+		self.assertEqual(output, expected[0:-1])	
+		self.assertEqual(NDNsim.num_failure, 0)
+		
+	#-------------------------------------
+	#Checks if link failure is done (56)
+	#-------------------------------------		
+	def test_link_failure(self):
+		#Init globals
+		NDNsim.num_failure = 0
+		NDNsim.num_failure_lock = Lock()	
+		
+		#Socker config
+		ip = 'localhost'
+		src_port = 8080
+		dest_port = 8081
+		
+		#Start the server
+		t1 = Thread(target=generic_server, args=[ip, dest_port])
+		t1.start()
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+		
+		#Send a packet that will fail
+		packet = NDNsim.Packet()
+		packet.name = NDNsim.Hybrid_Name()
+		NDNsim.send_packet(ip, src_port, dest_port, packet, True, "1, 1", ["uniform", "0, 0.5"])		
+		
+		#Grab print
+		output = out.getvalue().rstrip()
+	
+		#Redirect STD
+		sys.stdout = prev_stdout	
+			
+		#Check value
+		self.assertEqual(output, "Link failure!")	
+		self.assertEqual(NDNsim.num_failure, 1)	
+			
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+				
+		#Send a packet that will close
+		packet = NDNsim.Packet()
+		packet.name = NDNsim.Hybrid_Name(hierarchical_component = 'close')
+		NDNsim.send_packet(ip, src_port, dest_port, packet, False, "0, 0", ["uniform", "0, 0.5"])
+		t1.join()
+	
+		#Grab print
+		output = out.getvalue().rstrip()
+	
+		#Redirect STD
+		sys.stdout = prev_stdout	
+#-------------------------------------------------------------------------------	
+
+#-------------------------------------------------------------------------------
+class TestPrecache(unittest.TestCase): #precache
+
+	print("Starting Precache Tests")	
 	maxDiff = None
 	#-------------------------------------
+	#Test precache on empty cache (57)
+	#-------------------------------------	
+	def test_precache_empty_test(self):
+		#Init globals
+		NDNsim.num_precache = 0
+		NDNsim.num_precache_lock = Lock()
+
+		#Create a node
+		node_1 = NDNsim.Node()
+		
+		#Create 5 new packets to be cached
+		new_packets = []
+		expected = 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: hello\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		for x in range(5):
+			new_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='hello'), counter=x))
+			expected_1 = '\nPacket ' + str(x) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: hello\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+			expected = expected + expected_1 + expected_2
+		expected = expected + 'Cache Entry Info End\n'
+		NDNsim.precache(node_1, new_packets)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.cache)):
+			node_1.cache[x].print_info()
 	
-	def test_close_one_thread(self):
-	def test_close_5_threads(self):
-	def test_close_50_threads(self):
+		#Grab print
+		output = out.getvalue().rstrip()
 	
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		#Check values
+		self.assertEqual(output, expected[0:-1])
+		self.assertEqual(NDNsim.num_precache, 1)
+
+	#-------------------------------------
+	#Test precache on a non-empty cache with no matching entry (58)
+	#-------------------------------------	
+	def test_precache_not_empty_no_match_test(self):
+		#Init globals
+		NDNsim.num_precache = 0
+		NDNsim.num_precache_lock = Lock()
+
+		#Create a node
+		node_1 = NDNsim.Node()
+		
+		#Fill the cache with 5 entry of 5 packets
+		expected = ''
+		for x in range(5):
+			temp_packets = []
+			expected = expected + 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			for y in range(5):
+				expected_1 = '\nPacket ' + str(y) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+				expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+				expected = expected + expected_1 + expected_2
+				temp_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name=str(x)), counter=y))
+			node_1.cache.append(NDNsim.Cache_Entry(NDNsim.Hybrid_Name(device_name=str(x)), temp_packets))
+			expected = expected + 'Cache Entry Info End\n'
+	
+		#Create 5 new packets to be cached
+		new_packets = []
+		expected = expected + 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: hello\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		for x in range(5):
+			new_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='hello'), counter=x))
+			expected_1 = '\nPacket ' + str(x) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: hello\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+			expected = expected + expected_1 + expected_2
+		expected = expected + 'Cache Entry Info End\n'
+		NDNsim.precache(node_1, new_packets)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.cache)):
+			node_1.cache[x].print_info()
+	
+		#Grab print
+		output = out.getvalue().rstrip()
+	
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		#Check values
+		self.assertEqual(output, expected[0:-1])
+		self.assertEqual(NDNsim.num_precache, 1)
+
+	#-------------------------------------
+	#Test precache on a non-empty cache with matching entry with missing packets (59)
+	#-------------------------------------	
+	def test_precache_not_empty_test_match_missing(self):
+		#Init globals
+		NDNsim.num_precache = 0
+		NDNsim.num_precache_lock = Lock()
+
+		#Create a node
+		node_1 = NDNsim.Node()
+		
+		#Fill the cache with 5 entry of 5 packets
+		expected = ''
+		for x in range(5):
+			temp_packets = []
+			expected = expected + 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			for y in range(5):
+				expected_1 = '\nPacket ' + str(y) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+				expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+				expected = expected + expected_1 + expected_2
+				temp_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name=str(x)), counter=y))
+			node_1.cache.append(NDNsim.Cache_Entry(NDNsim.Hybrid_Name(device_name=str(x)), temp_packets))
+			expected = expected + 'Cache Entry Info End\n'
+	
+		#Create 5 new packets to be cached
+		new_packets = []
+		for x in range(5):
+			new_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='3'), counter=x))
+		NDNsim.precache(node_1, new_packets)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.cache)):
+			node_1.cache[x].print_info()
+	
+		#Grab print
+		output = out.getvalue().rstrip()
+	
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		#Check values
+		self.assertEqual(output, expected[0:-1])
+		self.assertEqual(NDNsim.num_precache, 1)
+
+	#-------------------------------------
+	#Test precache on a non-empty cache with matching entry with no missing packets (60)
+	#-------------------------------------	
+	def test_precache_not_empty_test_match_not_missing(self):
+		#Init globals
+		NDNsim.num_precache = 0
+		NDNsim.num_precache_lock = Lock()
+
+		#Create a node
+		node_1 = NDNsim.Node()
+		
+		#Fill the cache with 5 entry of 5 packets
+		expected = ''
+		for x in range(5):
+			temp_packets = []
+			expected = expected + 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			for y in range(5):
+				expected_1 = '\nPacket ' + str(y) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+				expected_2 = ''
+				if x == 3:
+					expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 999\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+				else:
+					expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+				expected = expected + expected_1 + expected_2
+				temp_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name=str(x)), counter=y))
+			node_1.cache.append(NDNsim.Cache_Entry(NDNsim.Hybrid_Name(device_name=str(x)), temp_packets))
+			expected = expected + 'Cache Entry Info End\n'
+	
+		#Create 5 new packets to be cached
+		new_packets = []
+		for x in range(5):
+			new_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='3'), counter=x, total_size=999))
+		NDNsim.precache(node_1, new_packets)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.cache)):
+			node_1.cache[x].print_info()
+	
+		#Grab print
+		output = out.getvalue().rstrip()
+	
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		#Check values
+		self.assertEqual(output, expected[0:-1])
+		self.assertEqual(NDNsim.num_precache, 1)
+#-------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------
+class TestInterestPacketNext(unittest.TestCase): #interest_packet_next
+
+	print("Starting Interest Packet Next Tests")	
+	maxDiff = None
+	#-------------------------------------
+	#Test empty PIT (61)
+	#-------------------------------------
+	def test_interest_empty_pit(self):
+		node_1 = NDNsim.Node()
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1R153AN', hierarchical_component='VA/Fairfax/GMU/CS'))
+		node_1.FIB = ['VA', 'VA/Fairfax/', 'Hello/Fairfax/GMU/CS', 'NA'] #match with [1]
+		node_1.weights = [1, 2, 3, 4] #match with [1]
+		
+		new_packets, next_node = NDNsim.interest_packet_next(node_1, packet, 0)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.PIT)):
+			node_1.PIT[x].print_info()
+
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Total Counter: 0\nIncoming Interface: 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)	
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 2.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(next_node, [1])	
+		
+	#-------------------------------------
+	#Test interest collapsing, non empty PIT (62)
+	#-------------------------------------
+	def test_interest_interest_collapse(self):
+		node_1 = NDNsim.Node()
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1', hierarchical_component='VA/Fairfax/GMU/CS'))
+		node_1.FIB = ['VA', 'VA/Fairfax/', 'Hello/Fairfax/GMU/CS', 'NA'] #match with [1]
+		node_1.weights = [1, 2, 3, 4] #match with [1]
+		
+		#Make 3 PIT entries
+		expected = ''
+		for x in range(3):
+			node_1.PIT.append((NDNsim.PIT_Entry(NDNsim.Hybrid_Name(device_name=str(x), hierarchical_component='VA/Fairfax/GMU/CS'), 0, 4)))
+			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Total Counter: 0\nIncoming Interface: 4\n'
+			expected = expected + expected_1 + expected_2
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out
+			
+		new_packets, next_node = NDNsim.interest_packet_next(node_1, packet, 0)
+		
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, "Interest Collapsed!")
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.PIT)):
+			node_1.PIT[x].print_info()
+
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Total Counter: 0\nIncoming Interface: 0'
+		expected = expected + expected_1 + expected_2
+		
+		self.assertEqual(output, expected)	
+		self.assertEqual(new_packets, [])
+		self.assertEqual(next_node, [])
+			
+	#-------------------------------------
+	#Test no interest collapsing (63)
+	#-------------------------------------
+	def test_interest_no_interest_collapse(self):
+		node_1 = NDNsim.Node()
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='100', hierarchical_component='VA/Fairfax/GMU/CS'))
+		node_1.FIB = ['VA', 'VA/Fairfax/', 'Hello/Fairfax/GMU/CS', 'NA'] #match with [1]
+		node_1.weights = [1, 2, 3, 4] #match with [1]
+		
+		#Make 3 PIT entries
+		expected = ''
+		for x in range(3):
+			node_1.PIT.append((NDNsim.PIT_Entry(NDNsim.Hybrid_Name(device_name=str(x), hierarchical_component='VA/Fairfax/GMU/CS'), 0, 4)))
+			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Total Counter: 0\nIncoming Interface: 4\n\n'
+			expected = expected + expected_1 + expected_2
+		
+		new_packets, next_node = NDNsim.interest_packet_next(node_1, packet, 0)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.PIT)):
+			node_1.PIT[x].print_info()
+			print("")
+
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 100\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Total Counter: 0\nIncoming Interface: 0'
+		expected = expected + expected_1 + expected_2
+		self.assertEqual(output, expected)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 100\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 2.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(next_node, [1])	
+				
+#-------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------
+class TestDataPacketNext(unittest.TestCase): #data_packet_next
+
+	print("Starting Data Packet Next Tests")	
+	maxDiff = None
+	#-------------------------------------
+	#Test empty PIT, no precache forwarding (64)
+	#-------------------------------------
+	def test_data_empty_pit(self):
+		node_1 = NDNsim.Node()
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1R153AN', hierarchical_component='VA/Fairfax/GMU/CS'), total_packets=1)
+		
+		new_packets, next_node = NDNsim.data_packet_next(node_1, packet)
+		self.assertEqual(new_packets, [])	
+		self.assertEqual(next_node, [])	
+		
+	#-------------------------------------
+	#Test non empty PIT, no precache forwarding, 1 matching entry (65)
+	#-------------------------------------
+	def test_data_1_match(self):
+		node_1 = NDNsim.Node()
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1', hierarchical_component='VA/Fairfax/GMU/CS'), total_packets=1)
+		
+		#Make 3 PIT entries
+		expected = ''
+		for x in range(3):
+			node_1.PIT.append((NDNsim.PIT_Entry(NDNsim.Hybrid_Name(device_name=str(x), hierarchical_component='VA/Fairfax/GMU/CS'), 0, 4)))
+			if x != 1:
+				expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+				expected_2 = 'Total Counter: 0\nIncoming Interface: 4\n'
+				expected = expected + expected_1 + expected_2
+		
+		new_packets, next_node = NDNsim.data_packet_next(node_1, packet)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.PIT)):
+			node_1.PIT[x].print_info()
+
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, expected[0:-1])
+			
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(next_node, [4])	
+
+	#-------------------------------------
+	#Test non empty PIT, no precache forwarding, 2 matching entry (66)
+	#-------------------------------------
+	def test_data_2_match(self):
+		node_1 = NDNsim.Node()
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1', hierarchical_component='VA/Fairfax/GMU/CS'), total_packets=1)
+		
+		#Make 3 PIT entries
+		expected = ''
+		for x in range(3):
+			node_1.PIT.append((NDNsim.PIT_Entry(NDNsim.Hybrid_Name(device_name=str(x), hierarchical_component='VA/Fairfax/GMU/CS'), 0, 4)))
+			if x != 1:
+				expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+				expected_2 = 'Total Counter: 0\nIncoming Interface: 4\n'
+				expected = expected + expected_1 + expected_2
+		node_1.PIT.append((NDNsim.PIT_Entry(NDNsim.Hybrid_Name(device_name='1', hierarchical_component='VA/Fairfax/GMU/CS'), 0, 7)))
+		
+		new_packets, next_node = NDNsim.data_packet_next(node_1, packet)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.PIT)):
+			node_1.PIT[x].print_info()
+
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, expected[0:-1])
+			
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected + "\n" + expected)
+		self.assertEqual(next_node, [4, 7])	
+		
+	#-------------------------------------
+	#Test non empty PIT, no precache forwarding, 1 matching entry, total_packets (67)
+	#-------------------------------------
+	def test_data_1_match_total_size(self):
+		node_1 = NDNsim.Node()
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1', hierarchical_component='VA/Fairfax/GMU/CS'), total_packets=2)
+		
+		#Make 3 PIT entries
+		expected = ''
+		for x in range(3):
+			node_1.PIT.append((NDNsim.PIT_Entry(NDNsim.Hybrid_Name(device_name=str(x), hierarchical_component='VA/Fairfax/GMU/CS'), 0, 4)))
+			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Total Counter: 0\nIncoming Interface: 4\n'
+			if x == 1:
+				expected_2 = 'Total Counter: 1\nIncoming Interface: 4\n'
+			expected = expected + expected_1 + expected_2
+		
+		#Send 1/2 packets
+		new_packets, next_node = NDNsim.data_packet_next(node_1, packet)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.PIT)):
+			node_1.PIT[x].print_info()
+
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, expected[0:-1])
+			
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 2\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(next_node, [4])
+		
+		#Send 2/2 packets
+		new_packets, next_node = NDNsim.data_packet_next(node_1, packet)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		expected = ''
+		for x in range(3):
+			if x != 1:
+				expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+				expected_2 = 'Total Counter: 0\nIncoming Interface: 4\n'
+				expected = expected + expected_1 + expected_2
+				
+		for x in range(len(node_1.PIT)):
+			node_1.PIT[x].print_info()
+			
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual(output, expected[0:-1])
+			
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 2\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(next_node, [4])		
+	
+	#-------------------------------------
+	#Test precache forwarding (68)
+	#-------------------------------------
+	def test_data_precache(self):
+		node_1 = NDNsim.Node(number=1)
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1', hierarchical_component='VA/Fairfax/GMU/CS'), destination=7)
+		NDNsim.global_topology = NDNsim.Topology('./topologies/full_topology.txt')
+		
+		new_packets, next_node = NDNsim.data_packet_next(node_1, packet)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: 7\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(next_node, [2])
+
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1', hierarchical_component='VA/Fairfax/GMU/CS'), destination=1)
+		
+		new_packets, next_node = NDNsim.data_packet_next(node_1, packet)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: 1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(next_node, [-1])
+				
 #-------------------------------------------------------------------------------	
 
-
-'''
+#-------------------------------------------------------------------------------
+# UNTESTED
+#class TestShutdownNodes(unittest.TestCase): #close_threads TODO Mayebe
+#class TestSocketCode(unittest.TestCase): #socket_code
+#class TestServiceConnection(unittest.TestCase): #service_connection
+#class TestReadargs(unittest.TestCase): #readargs
+#-------------------------------------------------------------------------------	
 	
 if __name__ == '__main__':
 	unittest.main()
