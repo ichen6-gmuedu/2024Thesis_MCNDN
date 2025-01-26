@@ -3,7 +3,7 @@
 #-------------------------------------------
 # IMPORTS
 
-import socket, pickle, time, subprocess, argparse, os
+import socket, pickle, time, subprocess, argparse, os, random
 import numpy as np
 from copy import deepcopy
 from threading import Lock, Thread
@@ -73,7 +73,7 @@ class Hybrid_Name:
 # interest if data name has no data_hash, data if it does
 # total_packets: tells PIT how many packets to expect
 class Packet:
-	def __init__(self, name: Hybrid_Name=None, time: float=0.0, total_packets: int=-1, counter: int=-1, alpha: float=0.0, delta: float=0.0, velocity: float=0.0, total_size: int=0, payload: str='', lambda_: float=0.0, destination: int=-1, precache: bool=False, number: int=0):
+	def __init__(self, name: Hybrid_Name=None, time: float=0.0, total_packets: int=-1, counter: int=-1, alpha: float=0.0, delta: float=0.0, velocity: float=0.0, total_size: int=0, payload: str='', lambda_: list=None, destination: int=-1, precache: bool=False, number: int=0):
 		self.name = name #Hybrid_Name object
 		
 		# interest packet
@@ -81,7 +81,7 @@ class Packet:
 		self.alpha = alpha #linger time
 		self.delta = delta #delta
 		self.velocity = velocity #v
-		self.lambda_ = lambda_ # transmission rate of everything so far.
+		self.lambda_ = [] # transmission rate of everything so far.
 		
 		# data packet only
 		self.total_packets = total_packets #signifies how many sub packets make up the total data
@@ -674,7 +674,7 @@ def interest_packet_next(node: Node, packet: Packet, previous_node: int) -> (lis
 				break
 		counter.append(value) # append match length for xth FIB entry
 	next_node.append(counter.index(max(counter))) # append the index of the longest match
-	packet.lambda_ = packet.lambda_ + node.weights[counter.index(max(counter))]
+	packet.lambda_.append(node.weights[counter.index(max(counter))])
 	new_packets.append(packet)
 	return new_packets, next_node
 
@@ -840,8 +840,13 @@ def service_connection(packet, node, previous_node, pktgen_num, precache_dist, c
 					next_node.append(previous_node) #always send back 
 				location = "producer"
 
+			
+			# Calculating the time to deliver data via reverse path
+			reversepath_timecalc = 0
+			for x in range(len(packet.lambda_)):
+				reversepath_timecalc = reversepath_timecalc + (total_size * packet.lambda_[x])
 			#Precache
-			if not ((total_size/packet.lambda_) + (time.time()-packet.time) < packet.alpha):
+			if not (reversepath_timecalc + (time.time()-packet.time) < packet.alpha):
 				packets_to_append, nodes_to_append, ret_Fail = precache_packet_helper(location, node, packet, new_packets, precache_dist, failure_range, phone_node_connect_order)
 				new_packets = new_packets + packets_to_append
 				next_node = next_node + nodes_to_append
@@ -899,7 +904,7 @@ def readargs():
 		help = "Starting port number for the mobile consumer.")
 
 	p.add_argument("-seed", "--seed", type = str, default = "",
-		help = "Seed for randomization for a controlled run. Will not thread behavior. Must be an int.")
+		help = "Seed for randomization for a controlled run. Will not effect thread behavior. Must be an int.")
 
 	p.add_argument("-o", "--outfile", type = str, default = 'metric_outfile.csv',
 		help = "Output file for simulation metrics. Appended to if exists already, creates if not.")
@@ -907,11 +912,11 @@ def readargs():
 	p.add_argument("-tp", "--topfile", type = str, default = 'topology.txt',
 		help = "The file to read in the topology of the NDN system.")
 		
-	p.add_argument("-w", "--weights", type = str, default = 'uniform:0, 1',
+	p.add_argument("-w", "--weights", type = str, default = 'uniform:0, 0.01',
 		help = "distribution:distrubution values\n\
 		The lambda_ values (aka transmission rates) for each link in the topology \n\
 		chosen from the given probability distribution.\n\
-		The default, \"uniform:0, 1\" means that each link has a transmission rate \n\
+		eg: \"uniform:0, 1\" means that each link has a transmission rate \n\
 		chosen by the uniform probability distrobution between 0-1")
 		
 	p.add_argument("-r", "--range", type = str, default = "uniform:0, 2",
@@ -926,7 +931,7 @@ def readargs():
 		Eg: \"uniform:0, 0.5\" means that every time a packet is being sent to another node,\n\
 		the possibility of it being sent is determined by the uniform probability distribution between 0 and 0.5.")		
 		
-	p.add_argument("-fr", "--failure_range", type = str, default = "0, 0.01",
+	p.add_argument("-fr", "--failure_range", type = str, default = "0, 0",
 		help = "\"lower bounds, upper bounds\"\n\
 		The percentage (from x to y) for the probability that a packet will fail when sent to the next node.\n\
 		Eg, \"0.1, 0.5\" means that every time a packet is being sent to another node,\n\
@@ -949,7 +954,7 @@ def readargs():
 		help = "When generating dummy data, determines how many data packets to generate.\n\
 		Default is 5 packets.")
 		
-	p.add_argument("-pd", "--precache_dist", type = str, default = "uniform:0, 0.01",
+	p.add_argument("-pd", "--precache_dist", type = str, default = "uniform:0, 0",
 		help = "\"distribution:distrubution values\"\n\
 		The probability distribution for determining whether a packet will be precached \n\
 		through the topology or through the infrastructure.\n\
@@ -958,16 +963,16 @@ def readargs():
 		is greater than a value between 0.0 and 0.5 (chosen by the uniform distribution), then the packet\n\
 		will be delivered through the infrastructure instead of the topology.")
 		
-	p.add_argument("-l", "--linger", type = str, default = "uniform:0, 0.5",
+	p.add_argument("-l", "--linger", type = str, default = "uniform:1, 5",
 		help = "\"distribution:distrubution values\"\n\
 		The probability distribution for MC's linger time at each gateway connection.\n\
-		Eg, the default: \"uniform:0, 0.5\" means that at each node the mobile consumer is connecting to,\n\
+		Eg: \"uniform:0, 0.5\" means that at each node the mobile consumer is connecting to,\n\
 		they are in range of that node for x seconds as determined by the uniform probability distribution between 0 and 0.5.")		
 		
-	p.add_argument("-d", "--delta", type = str, default = "3:uniform:0, 0.5",
+	p.add_argument("-d", "--delta", type = str, default = "3:uniform:1, 5",
 		help = "\"number_to_gen:distribution:distrubution values\"\n\
 		The probability distribution of deadline in seconds before the data expires.\n\
-		Eg, the default: \"3:uniform:0, 0.5\" means that the data packet must be received by the MC before \
+		Eg: \"3:uniform:0, 0.5\" means that the data packet must be received by the MC before \
 		the amount of seconds selected by the uniform probability distribution, between 0-0.5, \
 		before the MC moves and the interest is re-sent. This happens again 2 more times.")
 				
@@ -993,6 +998,7 @@ def readargs():
 	
 	if(args.seed != ""):
 		np.random.seed(int(args.seed))
+		random.seed(int(args.seed))
 		
 	ip = args.ip
 	port = int(args.port)
@@ -1048,6 +1054,7 @@ def readargs():
 	"\" -port \""+args.port+ \
 	"\" -pip \""+args.phone_ip+ \
 	"\" -pport \""+args.phone_port+ \
+	"\" -seed \""+args.seed+ \
 	"\" -o \""+args.outfile+ \
 	# for the topology
 	"\" -tp \"" +args.topfile+ \
@@ -1167,7 +1174,7 @@ if __name__ == "__main__":
 	counter_x = 0
 	counter_delta = 0
 	timeout_counter = 0 
-	alphaout_counter = 0
+	linger_timeout_counter = 0
 	delta_timeout_counter = 0
 	internal_timeout_counter = 0
 	temp_alpha = 0 # linger time after timeout
@@ -1257,7 +1264,7 @@ if __name__ == "__main__":
 			timestamp.append("Linger Time Timeout: " + str(alpha))
 			counter_x = counter_x + 1
 			timeout_counter = timeout_counter + 1
-			alphaout_counter = alphaout_counter + 1
+			linger_timeout_counter = linger_timeout_counter + 1
 			timeout_time.append(end_time_2)
 			if counter_x >= len(velocity):
 				print("Last linger time exceeded! Interest has failed!")
@@ -1388,6 +1395,8 @@ if __name__ == "__main__":
 	
 	
 	print("Number of Link Failures: " + str(num_failure))
+	
+	print("")
 	if(len(sorted_final_data)) == total_data_counter:
 		print("Successful Delivery due to Cache Hit?: " + str(precache_check))
 	print("Number of Proactive Deliveries: " + str(num_pro_del))
@@ -1404,12 +1413,13 @@ if __name__ == "__main__":
 		f = open(metrics_outfile, 'a')
 	else: #if the file doesnt exist, create a new one and add the header
 		f = open(metrics_outfile, 'w')
-		f.write("ip, \
-port, \
-phone ip,\
-phone port, \
+		f.write("IP, \
+Port, \
+Phone_IP,\
+Phone_Port, \
+Seed, \
 Topfile, \
-Weightdist, \
+Weight_dist, \
 Range_dist, \
 Failure_dist, \
 Failure_range, \
@@ -1425,14 +1435,15 @@ Delta_dist, \
 Delta, \
 Timeout, \
 Phone_test, iperf_test, \
-End-To-End Delay, Total Number of Timeouts, Number of Linger Time Timeouts, Number of Delta Timeouts, Number of Internal Timeouts, Number of Link Failures, Percent of Dropped Packets, Success?, Success due to Cache Hit?, Number of Proactive Delivery, Number of Infrastructure Delivery, Number of Precaches, Number of Cache Hits")
+total_delay, timeout_counter, linger_timeout_counter, delta_timeout_counter, internal_timeout_counter, num_failure, dropped_packets_percent, rec_data, precache_check, num_pro_del, num_infrastructure, num_precache, num_cache_hit\n")
 	
 	
 	f.write("\""+args.ip+\
-	 "\""+args.port+\
-	 "\""+args.phone_ip+\
-	 "\""+args.phone_port+\
-	 "\""+args.topfile+\
+	 "\", \"" +args.port+\
+	 "\", \"" +args.phone_ip+\
+	 "\", \"" +args.phone_port+\
+	 "\", \"" +args.seed+\
+	 "\", \"" +args.topfile+\
 	 "\", \"" +args.weights+\
 	 "\", \"" +str(args.range)+\
 	 "\", \"" +str(args.failure_dist)+\
@@ -1442,6 +1453,7 @@ End-To-End Delay, Total Number of Timeouts, Number of Linger Time Timeouts, Numb
 	 "\", \"" +args.velocity+\
 	 "\", \"" +str(velocity)+\
 	 "\", \"" +str(args.pktgen_num)+\
+	 "\", \"" +str(args.precache_dist)+\
 	 "\", \"" +str(args.linger)+\
 	 "\", \"" +str(linger)+\
 	 "\", \"" +args.delta+ "\", \"" +str(delta)+\
@@ -1450,7 +1462,7 @@ End-To-End Delay, Total Number of Timeouts, Number of Linger Time Timeouts, Numb
 	 "\", \"" +str(args.iperf_test)+ \
 	 "\", "+ str(total_delay) + ", " + \
 	 str(timeout_counter) + ", " + \
-	 str(alphaout_counter) + ", " + \
+	 str(linger_timeout_counter) + ", " + \
 	 str(delta_timeout_counter) + ", " + \
 	 str(internal_timeout_counter) + ", " + \
 	 str(num_failure) + ", " + \
