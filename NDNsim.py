@@ -81,7 +81,10 @@ class Packet:
 		self.alpha = alpha #linger time
 		self.delta = delta #delta
 		self.velocity = velocity #v
-		self.lambda_ = [] # transmission rate of everything so far.
+		if lambda_ == None:
+			self.lambda_ = [] # transmission rate of everything so far.
+		else:
+			self.lambda_ = lambda_
 		
 		# data packet only
 		self.total_packets = total_packets #signifies how many sub packets make up the total data
@@ -890,6 +893,10 @@ def readargs():
 	global logging
 
 	p = argparse.ArgumentParser(description = "Mobile Consumer NDN simulator")
+		
+	p.add_argument("-ihn", "--interest_hybrid_name", type = str, default = 'VA/Fairfax/GMU/CS/actionOn:1R153AN',
+		help = "The hybrid name of the requested data. \n\
+		Default is 'VA/Fairfax/GMU/CS/actionOn:1R153AN' and is able to be satisfied on the third node of the default topology.")
 	
 	p.add_argument("-ip", "--ip", type = str, default = 'localhost',
 		help = "IP for the topology (computer simulated nodes).")
@@ -1050,7 +1057,8 @@ def readargs():
 		
 	print("---")
 	print("CLI: python3 NDNsim.py "+ \
-	"-ip \""+args.ip+ \
+	"-ihn \""+args.interest_hybrid_name+ \
+	"\" -ip \""+args.ip+ \
 	"\" -port \""+args.port+ \
 	"\" -pip \""+args.phone_ip+ \
 	"\" -pport \""+args.phone_port+ \
@@ -1150,20 +1158,28 @@ if __name__ == "__main__":
 			shutdown_nodes(ip, port-1, port+num_nodes, thread_list)
 			exit()
 			
-	# If not connecting to phone, use this as interest
+	# If not connecting to phone, use CLI as interest
 	else:
-		phone_data = 'VA/Fairfax/GMU/CS/actionOn:1R153AN'
+		phone_data = args.interest_hybrid_name
 		
 	# -----
 	# Parse data string and save as hybrid name object
-	temp = phone_data.split(":")
-	temp2 = temp[0].split("/")
-	hierarchical_component = "/".join(temp2[0:len(temp2)-1])
-	task = temp2[-1]
-	flat_component = temp[1]
-	device_name = flat_component
-	data_hash = ""
-	h_name = Hybrid_Name(task, device_name, data_hash, hierarchical_component, flat_component)
+	try: 
+		temp = phone_data.split(":")
+		temp2 = temp[0].split("/")
+		hierarchical_component = "/".join(temp2[0:len(temp2)-1])
+		task = temp2[-1]
+		flat_component = temp[1]
+		device_name = flat_component
+		data_hash = ""
+		h_name = Hybrid_Name(task, device_name, data_hash, hierarchical_component, flat_component)
+	except:
+		print("Interest Hybrid Name Formatted Incorrectly!")
+		if phone_test:
+			phone_client.send(("Interest Hybrid Name Formatted Incorrectly!").encode('utf-8'))
+			phone_client.close()
+		shutdown_nodes(ip, port-1, port+num_nodes, thread_list)
+		exit()
 
 	# -----
 	# NDN Gauntlet
@@ -1225,7 +1241,7 @@ if __name__ == "__main__":
 		end_time_2 = curr_time + alpha 
 		
 		# Sends interest packet from dummy node (-1) to access point (phone node)
-		send_packet(ip, port-1, port+phone_node+num_nodes, Packet(h_name, curr_time, 0, 0, alpha, delta[counter_delta], velocity[counter_x], -1, "", 0.0001, -1, False, len(final_data)-1), True, failure_range, failure_dist)	
+		send_packet(ip, port-1, port+phone_node+num_nodes, Packet(h_name, curr_time, 0, 0, alpha, delta[counter_delta], velocity[counter_x], -1, "", [], -1, False, len(final_data)-1), True, failure_range, failure_dist)	
 		
 		# loop until we reach delta, linger, or timeout (end time)
 		while ((curr_time <= end_time) and (curr_time <= end_time_1) and (curr_time <= end_time_2)):
@@ -1292,8 +1308,8 @@ if __name__ == "__main__":
 	# -----
 	# Sort the data
 	precache_check = True
+	sorted_final_data = []
 	if rec_data == True:
-		sorted_final_data = []
 		final_data_lock.acquire()
 		temp_final_copy = (deepcopy(final_data))[-1]
 		final_data_lock.release()
@@ -1347,6 +1363,8 @@ if __name__ == "__main__":
 							print("")
 						print("\n\n")
 				empty = False
+		if pit_time+45 < time.time() and not empty:
+			print("Continuing with shutdown with PIT entries still present!") 
 		if empty == True:
 			break
 	
@@ -1376,28 +1394,28 @@ if __name__ == "__main__":
 	for x in range(len(final_data)):
 		total_data_counter = total_data_counter + len(final_data[x])
 	counter = 0
-	for x in range(len(timeout_time)):
-		local_counter = 0
-		for y in range(len(packet_drop[x])):
-			if packet_drop[x][y] > timeout_time[x]:
-				local_counter = local_counter + 1
-		dropped_counter = dropped_counter + local_counter
-		print("Interest " + str(x) + " had " + str(local_counter) + "/" + str(len(packet_drop[x])) + " packets drop")
-		counter = counter + 1
-	if len(timeout_time) != len(final_data):
-		print("Interest " + str(counter) + " had 0/" + str(len(final_data[counter])) + " packets drop")
-	if(total_data_counter>0):
-		print("Percentage of dropped packets: " + str(dropped_counter/total_data_counter*100) + "%")
+	if total_data_counter == 0:
+		print("No data packets recieved!")
+		percent_dropped = None
 	else:
-		total_data_counter = 1
-		print("Percentage of dropped packets: " + str(dropped_counter/total_data_counter*100) + "%")
-	
+		for x in range(len(timeout_time)):
+			local_counter = 0
+			for y in range(len(packet_drop[x])):
+				if packet_drop[x][y] > timeout_time[x]:
+					local_counter = local_counter + 1
+			dropped_counter = dropped_counter + local_counter
+			print("Interest " + str(x) + " had " + str(local_counter) + "/" + str(len(packet_drop[x])) + " packets drop")
+			counter = counter + 1
+		if len(timeout_time) != len(final_data):
+			print("Interest " + str(counter) + " had 0/" + str(len(final_data[counter])) + " packets drop")
+		percent_dropped = dropped_counter/total_data_counter*100
+		print("Percentage of dropped packets: " + str(percent_dropped) + "%")
 	
 	
 	print("Number of Link Failures: " + str(num_failure))
 	
 	print("")
-	if(len(sorted_final_data)) == total_data_counter:
+	if timeout_check:
 		print("Successful Delivery due to Cache Hit?: " + str(precache_check))
 	print("Number of Proactive Deliveries: " + str(num_pro_del))
 	print("Number of Deliveries through Infrasctructure: " + str(num_infrastructure))
@@ -1413,12 +1431,14 @@ if __name__ == "__main__":
 		f = open(metrics_outfile, 'a')
 	else: #if the file doesnt exist, create a new one and add the header
 		f = open(metrics_outfile, 'w')
-		f.write("IP, \
+		f.write("Interest_hybrid_name, \
+IP, \
 Port, \
 Phone_IP,\
 Phone_Port, \
 Seed, \
 Topfile, \
+Interest_hybrid_name, \
 Weight_dist, \
 Range_dist, \
 Failure_dist, \
@@ -1438,7 +1458,8 @@ Phone_test, iperf_test, \
 total_delay, timeout_counter, linger_timeout_counter, delta_timeout_counter, internal_timeout_counter, num_failure, dropped_packets_percent, rec_data, precache_check, num_pro_del, num_infrastructure, num_precache, num_cache_hit\n")
 	
 	
-	f.write("\""+args.ip+\
+	f.write("\""+args.interest_hybrid_name+\
+	 "\", \"" +args.ip+\
 	 "\", \"" +args.port+\
 	 "\", \"" +args.phone_ip+\
 	 "\", \"" +args.phone_port+\
@@ -1466,7 +1487,7 @@ total_delay, timeout_counter, linger_timeout_counter, delta_timeout_counter, int
 	 str(delta_timeout_counter) + ", " + \
 	 str(internal_timeout_counter) + ", " + \
 	 str(num_failure) + ", " + \
-	 str(dropped_counter/total_data_counter*100) + ", " + \
+	 str(percent_dropped) + ", " + \
 	 str(rec_data) + ", " + \
 	 str(precache_check) + ", " + \
 	 str(num_pro_del) + ", " + \

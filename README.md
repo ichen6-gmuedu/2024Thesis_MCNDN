@@ -48,6 +48,7 @@ Install iperf3 via the iperf3 website. https://iperf.fr/iperf-download.php
 ```
 sudo apt-get install iperf3
 ```
+
 ### Android SDK Installation
 
 Installation instructions: https://stackoverflow.com/questions/34556884/how-to-install-android-sdk-on-ubuntu
@@ -98,6 +99,7 @@ The program NDNsim.py contains 16 arguments for the NDN simulator.
 | cmd line option    | Default	| Format | Description |
 | --------- | --------- | --------- |  --------- | 
 | -ip, --ip	| 'localhost' | IP address | IP for the topology (computer simulated nodes). |
+| -ip, --ip	| 'localhost' | IP address | IP for the topology (computer simulated nodes). |
 | -port, --port	| '8080' | port number | Starting port number for the topology (computer simulated nodes). |
 | -pip, --phone_ip	| '192.168.1.207' | IP address | IP for the mobile consumer. |
 | -pport, --phone_port	| '9095' | port number | Starting port number for the mobile consumer. |
@@ -128,14 +130,14 @@ python3 NDNsim.py
 To run with all command line inputs: 
 
 ```
-python3 NDNsim.py -ip "localhost" -port "8080" -pip "192.168.1.207" -pport "9095" -seed "" -o "metric_outfile.csv" -tp "topology.txt" -w "uniform:0, 0.01" -r "uniform:0, 2" -fd "uniform:1, 1" -fr "0, 0" -pnco "3:uniform:0, 8" -v "uniform:0, 2" -pgn "5" -pd "uniform:0, 0" -l "uniform:5, 5" -d "3:uniform:1, 5" -to "5" -log "False" -pt "False" -ipt "False"
+python3 NDNsim.py -ign "VA/Fairfax/GMU/CS/actionOn:1R153AN" -ip "localhost" -port "8080" -pip "192.168.1.207" -pport "9095" -seed "" -o "metric_outfile.csv" -tp "topology.txt" -w "uniform:0, 0.01" -r "uniform:0, 2" -fd "uniform:1, 1" -fr "0, 0" -pnco "3:uniform:0, 8" -v "uniform:0, 2" -pgn "5" -pd "uniform:0, 0" -l "uniform:5, 5" -d "3:uniform:1, 5" -to "5" -log "False" -pt "False" -ipt "False"
 ```
 
 ### Configuring NDNsim For Android Device
 
 To run with the Android Device, first run the Android application using the **debugging button** or **run button** on Android SDK. 
 
-The physical Android device should open the application automatically. On the application, the screen should display an IP, port, and "Not Connected" at the top and a button that says "SEND INTEREST" at the bottom. 
+The physical Android device should open the application automatically. On the application, the screen should display an IP, port, and "Not Connected" at the top and a textbox, a button that says "SEND CUSTOM INTEREST", a button that says "SEND DEFAULT INTEREST", and a button that says "CLEAR SCREEN" at the bottom. 
 
 ```
 IMAGE HERE
@@ -147,9 +149,25 @@ The Phone's IP may be different depending on your network connection, so please 
 python3 NDNsim.py -pip 'DISPLAYED_IP' --port 'DISPLAYED_PORT' -pt True
 ```
 
-Now, unless you are waiting for iperf3 to generate data, the text on the Android App should read "Connected". Now that it is connected, tap the "SEND INTEREST" button to begin the NDN simulator.
+Unless you are waiting for iperf3 to generate data, the text on the Android App should now read "Connected". Now that it is connected, tap the "SEND DEFAULT INTEREST" button to begin the NDN simulator.
 
-Once the simulator is complete, you should see the requested data displayed on the phone screen. This should be dummy data (The numbers 1, 2, 3, 4, 5) or the generated iperf3 data if the toggle was turned on `-ipt True`.
+```
+IMAGE HERE
+```
+
+Once the simulator is complete, which should only take a few seconds, you should see the requested data displayed on the phone screen. This should be dummy data (The numbers 0, 1, 2, 3, 4) or the generated iperf3 data if the toggle was turned on `-ipt True`.
+
+```
+IMAGE HERE
+```
+
+To send interest packets with a custom hybrid name, type your custom hybrid name into the text box and tap "SEND CUSTOM INTEREST" when you are done. If the requested data name is formatted incorrectly, you should see a message that tells you so. 
+
+The hierarchical name for an interest packet is formatted with `/` separating the name sectinos and `:` separating the flat component. The following graphic is taken from "Hierarchical and Flat-Based Hybrid Naming Scheme in Content-Centric Networks of Things" by Arshad and Shahzaad et al., 2018. For the interest packet, only the interest message format is needed as input. 
+
+![hybrid_name](/readme_images/hybrid_example.png "hybrid_name")
+
+If the requested data name is formatted correctly and present in the topology with a node being able to satisfy the request, then you should be able to see the output with default the CLI. 
 
 ```
 IMAGE HERE
@@ -159,8 +177,15 @@ IMAGE HERE
 
 The file NDNsim_bash.sh allows you to execute batch runs of NDNsim.py with your specified parameters. This requires knowledge of Bash and the command line inputs. 
 
-For example, if you want to execute 5 runs of NDNsim.py with the same topology file and the varying timeouts as 5, 4, 3, 2, and 1, then you would change line 5 of NDNsim_bash.sh to be: 
-`TIMEOUT=("5" "4" "3" "2" "1")`
+The current version of the script simply includes a template for running 5 executions with one set of inputs, and another template for running 5 executions with changing values for the `TIMEOUT` while keeping all the other inputs the same. 
+
+To modify the bash script to run executions with your specific varying input, follow this guide. We will use the `TIMEOUT` input as the example.
+1. Find the existing value for your input (`TIMEOUT`). The line should look like `TIMEOUT=("1")`
+2. Replace the single value in the parenthesis with multiple values in quotes separated by a space. The line should now look like `TIMEOUT=("1" "2" "3")`
+3. Replace the existing value in the for loop so that it loops the same number of times as values you have put in. That line should look like `for i in $(seq 0 "$(("${#TIMEOUT[@]}"-1))");`
+4. Replace the Portion of the command that runs NDNsim.py with your variable so that it takes the i'th element of your variable. That section should now look like `-to "${TIMEOUT[$i]}"`
+5. Make sure the previous version of the variable is now replaced with a single value, and is not indexed in the command line input for NDNsim.py
+6. For readability, change the echo to reflect what you are testing in this batch. The line should look like echo `"...Testing TIMEOUT: ${TIMEOUT[$i]}"`
 
 After modifying the file to your specifications, execute the bash script with:
 
@@ -168,7 +193,74 @@ After modifying the file to your specifications, execute the bash script with:
 bash NDNsim_bash.sh
 ```
 
+### Configuring Topology File
+
+The example topology is a simple eight node topology as pictured in the accompanying thesis paper. 
+
+![topology_graphic](/readme_images/Topology_graphic.png "topology_graphic")
+
+From this example, the corresponding default topology file utilized in the simulation.
+
+![default_topology](/readme_images/default_topology.png "default_topology")
+
+The format of the topology has N rows and N+1 columns, where N is the number of nodes in the topology. The first elemt of each row is the data that this node would be able to satisfy, in essence, a hybrid name. The hybrid name consists of the Hierarchical Component that is used for the forwarding table and the flat component which consists of a hash of the device name and the data that this node would be able to satisfy. 
+
+In this example topology, the third node with "VA/Fairfax/GMU/CS:12153AN|Irisean" as the name of the data it is able to satisfy is the only one that acts as the producer in example tests.
+
+The rest of the row consists of that node's Forwarding Information Base (FIB), where the element is 0 if there is no connection between the two nodes, and a FIB entry for that node's hierarchical component if there is a connection. Refer to the hybrid name guide for data packets, except there is no need to include the task ("ActionOn") for the topology. 
+
+To create your own topology file, follow the this guide:
+1. There are N rows and N+1 columns for N nodes in the topology
+2. The first element of a row is the name and data hash that the node would be able to satisfy.
+3. The hierarchical name is formatted with `/` separating the name sectinos, `:` separating the flat component, and `|` separating the device name hash and the data hash. 
+4. Each element in a row is separated by a tab character.
+5. The Hierarchical component of the data a neighboring node is able to satisfy is the FIB entry for that node
+6. If there is no neighboring node for the corresponding element, then it is a 0.
+
 ## Expected Results
+
+### Simple Tests
+
+The image below is the expected output from the following command. For the default inputs, the linger and delta timeouts are determined by a uniform distribution between 1 and 5 seconds and additionally the link failure is determined by a uniform distribution between 1 and 1. 
+
+There should be no opportunities for the interest or data packets to be dropped or miss the deadlines, so the expected output has 0.0% dropped packets.
+
+```
+python3 NDNsim.py -seed 1
+```
+![NDNsim with seed=1](/readme_images/test_seed1.png "seed1 test")
+
+The end-to-end delay of your experiments may differ, as this simulator is threaded and the seed is only able to control the resulting values of the probability distributions. To see some of these values, run the following command to see the logging information. 
+
+```
+python3 NDNsim.py -seed 1 -log true
+```
+![NDNsim with seed=1 and log=true](/readme_images/test_seed1log.png "seed1log test")
+
+Your distribution values for phone_node_connect_order, velocity, and delta should match the ones in the image above. However as mentioned before, this simulation is threaded, so the order of packets ("data") being sent from one node to the next may be in a different order.
+
+For this next test, we will set the failure range ot be from 1 to 1, meaning that the failure distribution will need to surpass 1 in order to successfully deliver data from one node to the next. Next, we set failure distribution to be decided by a uniform distribution from 0 to 0.5, so that it will always fail. 
+
+```
+python3 NDNsim.py -seed 1 -fd "uniform:0, 0.5" -fr "1, 1"
+```
+![NDNsim with link failure](/readme_images/test_linkfailure.png "linkfailure test")
+
+The expected result is the interest failing to be sent to the first node in the topology, and all the timeouts having expired. This run should take a few seconds, as we are waiting for the timeouts to occur. In this run, the delta timeout occured three times, and it should be the same for you. 
+
+For this last test, we are going to force precaching to occur. To do this, we shall set the linger timeout to be determined by a uniform distribution between 0 and 0.1, and for the phone node connect order to have 10 re-connections, each node chosen by the uniform distribution between 0 and 8 (since there are 8 nodes total in the default topology).
+```
+python3 NDNsim.py -seed 1 -l "uniform:0, 0.1" -pnco "10:uniform:0, 8"
+```
+![NDNsim with precache](/readme_images/test_seedprecache.png "precache test")
+
+The expected result should have the text "Linger time exceeded!" occur in the simulation about three times and see the mobile consumer (MC) move to nodes 5, 0, and 2. There have been three proactive deliveries, and 12 precaches. 
+
+This means that we have reached a node that can satisfy the interest packet but cannot deliver to the MC at its original location and have decided to precache (proactively deliver) three times. Since we are generating 5 packets of data, there are more than 3 instances of precaching. "Number of Precaches" increases every time data is actually cached at the node.
+
+There were no deliveries through the infrastructure, as the default inputs for link failure probabilities are set to always deliver.
+
+Unfortunately, for this experiment the successful delivery of data was not due to a cache hit. This means that the mobile consumer had not received the data due to precaching, and instead recieved the data from the original producer. 
 
 ### Android 
 
@@ -215,9 +307,59 @@ The output file is `metric_outfile.csv` by default and records the inputs of the
 | num_precache | int | Number of times data was proactively cached at the node the mobile consumer was expected to reconnect after a linger time timeout. |
 | num_cache_hit | int | Number of Cache Hits in the test. |
 
-
 ## Modification and Testing
 
 ### Code Overview
 
+
+#### Classes
+
+##### Hybrid_Name
+
+##### Packet
+
+##### PIT_Entry
+
+##### Node
+
+##### Topology
+
+#### Functions
+
+##### print_info_helper
+
+##### distribution_helper
+
+##### generate_packets
+
+##### next_gateway
+
+##### calc_linger
+
+##### gen_N_random_values
+
+##### dijkstras
+
+##### precache_packet_helper
+
+##### send_packets
+
+##### precache
+
+##### interest_packet_next
+
+##### data_packet_next
+
+##### shutdown_nodes
+
+##### socket_code
+
+##### service_connection
+
+##### readargs
+
+#### Main
+
 ### Unit Tests
+
+Unit tests are included for the various functions in NDNsim.py in the `unit_tests` folder. If the program is modified, please refer to the unit tests.

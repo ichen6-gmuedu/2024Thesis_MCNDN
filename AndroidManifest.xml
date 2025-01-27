@@ -17,7 +17,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="Server">
+            android:label="NDNSim_MC_Server">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

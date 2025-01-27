@@ -3,17 +3,13 @@ package com.example.phone;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.phone.databinding.ActivityMainBinding;
-import android.annotation.SuppressLint;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
@@ -25,8 +21,6 @@ import java.nio.ByteOrder;
 import java.net.NetworkInterface;
 import java.util.List;
 import java.util.Collections;
-import android.content.Context;
-import java.util.Formatter;
 import android.text.method.ScrollingMovementMethod;
 
 
@@ -36,7 +30,10 @@ public class MainActivity extends AppCompatActivity {
     Thread Thread1 = null;
     TextView tvIP, tvPort, tvConnectionStatus;
     TextView tvMessages;
-    Button btnSend;
+    EditText etMessage;
+    Button btnSendCustom;
+    Button btnSendDefault;
+    Button btnClear;
     public static String SERVER_IP = "";
     public static final int SERVER_PORT = 9095;
     String message;
@@ -53,7 +50,10 @@ public class MainActivity extends AppCompatActivity {
         tvConnectionStatus = findViewById(R.id.tvConnectionStatus);
         tvMessages = findViewById(R.id.tvMessages);
         tvMessages.setMovementMethod(new ScrollingMovementMethod());
-        btnSend = findViewById(R.id.btnSend);
+        etMessage = findViewById(R.id.etMessage);
+        btnSendDefault = findViewById(R.id.btnSendDefault);
+        btnSendCustom = findViewById(R.id.btnSendCustom);
+        btnClear = findViewById(R.id.btnClear);
 
         try {
             SERVER_IP = getLocalIpAddress();
@@ -70,12 +70,28 @@ public class MainActivity extends AppCompatActivity {
 
         Thread1 = new Thread(new Thread1());
         Thread1.start();
-        btnSend.setOnClickListener(new View.OnClickListener() {
+        btnSendDefault.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(connectedflag) {
-                    new Thread(new Thread3(message)).start();
+                if(connectedflag) {new Thread(new Thread3()).start();}
+                else{tvMessages.append("Need to be connected to Client in order to send Interest\n");}
+            }
+        });
+        btnSendCustom.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                message = etMessage.getText().toString().trim();
+                if (!message.isEmpty() ) {
+                    if (connectedflag) {new Thread(new Thread4(message)).start();}
+                    else{tvMessages.append("Need to be connected to Client in order to send Interest\n");}
                 }
+                else{tvMessages.append("No Hybrid Name to create Interest Packet.\n");}
+            }
+        });
+        btnClear.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                tvMessages.setText("");
             }
         });
 
@@ -111,7 +127,6 @@ public class MainActivity extends AppCompatActivity {
     class Thread1 implements Runnable {
         @Override
         public void run() {
-            //Socket socket;
             try {
                 runOnUiThread(new Runnable() {
                     @Override
@@ -123,7 +138,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
                 try {
-
                     // connect to python client
                     socket = serverSocket.accept();
                     output = new PrintWriter(socket.getOutputStream());
@@ -141,6 +155,7 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                     tvMessages.append(e.toString());
                 }
+            //} catch (IOException e) {
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -153,7 +168,7 @@ public class MainActivity extends AppCompatActivity {
                 try {
 
 
-                    byte[] buffer = new byte[1024];
+                    byte[] buffer = new byte[1024]; //1024
                     int read;
                     while((read = input.read(buffer)) != -1) {
 
@@ -175,10 +190,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
     class Thread3 implements Runnable {
-        private String message;
-        Thread3(String message) {
-            this.message = message;
-        }
         @Override
         public void run() {
             String interestPacket = "VA/Fairfax/GMU/CS/actionOn:1R153AN";
@@ -190,6 +201,26 @@ public class MainActivity extends AppCompatActivity {
                     tvMessages.append("\nTest counter: " + Integer.toString(testCounter) + "\n");
                     testCounter ++;
                     tvMessages.append("Interest Packet: " + interestPacket + "\n");
+                }
+            });
+        }
+    }
+    class Thread4 implements Runnable {
+        private String message;
+        Thread4(String message) {
+            this.message = message;
+        }
+        @Override
+        public void run() {
+            String interestPacket = message;
+            output.write(interestPacket);
+            output.flush();
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    tvMessages.append("\nTest counter: " + Integer.toString(testCounter) + "\n");
+                    testCounter ++;
+                    tvMessages.append("Interest Packet: " + message + "\n");
                 }
             });
         }

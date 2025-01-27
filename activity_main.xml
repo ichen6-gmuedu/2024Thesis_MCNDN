@@ -29,11 +29,31 @@
         android:layout_below = "@+id/tvConnectionStatus"
         android:inputType = "textMultiLine"
         android:scrollbars = "vertical"
-        android:textAppearance = "@style/Base.TextAppearance.AppCompat.Medium" />
+        android:textAppearance = "@style/Base.TextAppearance.AppCompat.Medium"
+        android:layout_above = "@+id/etMessage"/>
+    <EditText
+        android:id = "@+id/etMessage"
+        android:layout_width = "match_parent"
+        android:layout_height = "wrap_content"
+        android:layout_above = "@+id/btnSendCustom"
+        android:hint = "Enter Hybrid Name"
+        android:inputType = "text" />
     <Button
-        android:id = "@+id/btnSend"
+        android:id = "@+id/btnSendCustom"
+        android:layout_width = "match_parent"
+        android:layout_height = "wrap_content"
+        android:layout_above = "@+id/btnSendDefault"
+        android:text = "SEND CUSTOM INTEREST" />
+    <Button
+        android:id = "@+id/btnSendDefault"
+        android:layout_width = "match_parent"
+        android:layout_height = "wrap_content"
+        android:layout_above = "@+id/btnClear"
+        android:text = "SEND DEFAULT INTEREST" />
+    <Button
+        android:id = "@+id/btnClear"
         android:layout_width = "match_parent"
         android:layout_height = "wrap_content"
         android:layout_alignParentBottom = "true"
-        android:text = "SEND INTEREST" />
+        android:text = "CLEAR SCREEN" />
 </RelativeLayout>

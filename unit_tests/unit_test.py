@@ -163,7 +163,7 @@ class TestPacket(unittest.TestCase): #Packet
 		
 		#Compare output
 		expected_1 = 'No Hierarchical Name!\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		
@@ -177,7 +177,7 @@ class TestPacket(unittest.TestCase): #Packet
 		#Object 2
 		#phone_data = 'VA/Fairfax/GMU/ECE/sensing/111111' #how the data appears raw
 		h_name_2 = NDNsim.Hybrid_Name('sensing', '111111', '', 'VA/Fairfax/GMU/ECE', '111111')
-		packet_2 = NDNsim.Packet(h_name_2, 1.0, 1, 1, 1.0, 1.0, 1.0, 1, 'hello', 1.0, 1, True, 1)	
+		packet_2 = NDNsim.Packet(h_name_2, 1.0, 1, 1, 1.0, 1.0, 1.0, 1, 'hello', [1.0], 1, True, 1)	
 	
 		#Redirect STD
 		prev_stdout = sys.stdout
@@ -193,7 +193,7 @@ class TestPacket(unittest.TestCase): #Packet
 		
 		#Compare output
 		expected_1 = 'No Hierarchical Name!\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 
@@ -207,7 +207,7 @@ class TestPacket(unittest.TestCase): #Packet
 		#Object 2
 		#phone_data = 'VA/Fairfax/GMU/ECE/sensing/111111' #how the data appears raw
 		h_name_2 = NDNsim.Hybrid_Name('sensing', '111111', '', 'VA/Fairfax/GMU/ECE', '111111')
-		packet_2 = NDNsim.Packet(h_name_2, 1.0, 1, 1, 1.0, 1.0, 1.0, 1, 'hello', 1.0, 1, True, 1)	
+		packet_2 = NDNsim.Packet(h_name_2, 1.0, 1, 1, 1.0, 1.0, 1.0, 1, 'hello', [1.0], 1, True, 1)	
 		
 		packet_1.name = NDNsim.Hybrid_Name()
 		packet_1.name.task = 'newTask' #Modify value
@@ -226,7 +226,7 @@ class TestPacket(unittest.TestCase): #Packet
 		
 		#Compare output
 		expected_1 = 'Hierarchical Name Info Start\nTask: newTask\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		
@@ -244,7 +244,7 @@ class TestPacket(unittest.TestCase): #Packet
 		
 		#Compare output
 		expected_1 = 'Hierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: 1.0\nDestination: 1\nPrecache: True\nNumber (for grouping): 1'
+		expected_2 = 'Time packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: [1.0]\nDestination: 1\nPrecache: True\nNumber (for grouping): 1'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 #-------------------------------------------------------------------------------
@@ -424,7 +424,7 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 		#Object 2
 		#phone_data = 'VA/Fairfax/GMU/ECE/sensing/111111' #how the data appears raw
 		h_name_2 = NDNsim.Hybrid_Name('sensing', '111111', '', 'VA/Fairfax/GMU/ECE', '111111') #data fields for object
-		packet_2 = NDNsim.Packet(h_name_2, 1.0, 1, 1, 1.0, 1.0, 1.0, 1, 'hello', 1.0, 1, True, 1)	
+		packet_2 = NDNsim.Packet(h_name_2, 1.0, 1, 1, 1.0, 1.0, 1.0, 1, 'hello', [1.0], 1, True, 1)	
 		Cache_Entry_2 = NDNsim.Cache_Entry(h_name_2, [packet_2, packet_2])
 		
 		Cache_Entry_1.data_name = NDNsim.Hybrid_Name()
@@ -445,7 +445,7 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 		
 		#Compare output
 		expected_1 = 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: newTask\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = '\nPacket 0\nNo Hierarchical Name!\nTime packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\nCache Entry Info End'
+		expected_2 = '\nPacket 0\nNo Hierarchical Name!\nTime packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\nCache Entry Info End'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		
@@ -463,8 +463,8 @@ class TestCache_Entry(unittest.TestCase): #Cache Entry
 		
 		#Compare output
 		expected_1 = 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\n'
-		expected_2 = '\nPacket 0\nHierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\nTime packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: 1.0\nDestination: 1\nPrecache: True\nNumber (for grouping): 1\n'
-		expected_3 = '\nPacket 1\nHierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\nTime packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: 1.0\nDestination: 1\nPrecache: True\nNumber (for grouping): 1\nCache Entry Info End'
+		expected_2 = '\nPacket 0\nHierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\nTime packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: [1.0]\nDestination: 1\nPrecache: True\nNumber (for grouping): 1\n'
+		expected_3 = '\nPacket 1\nHierarchical Name Info Start\nTask: sensing\nDevice Name: 111111\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/ECE\nFlat Component: 111111\nHierarchical Name Info End\nTime packet sent: 1.0\nTotal Packets : 1\nCounter: 1\nAlpha/Linger Time: 1.0\nDelta: 1.0\nVelocity: 1.0\nTotal Size: 1\nPayload: hello\nLambda: [1.0]\nDestination: 1\nPrecache: True\nNumber (for grouping): 1\nCache Entry Info End'
 		expected = expected_1 + expected_2 + expected_3
 		self.assertEqual(output, expected)
 		
@@ -1007,7 +1007,7 @@ class TestGeneratePackets(unittest.TestCase): #generate_packets
 		
 		#Compare output
 		expected_1 = 'No Hierarchical Name!\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: 0\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 1\nPayload: 0\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: 0\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 1\nPayload: 0\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(packet_output[0], expected)
 		self.assertEqual(total_size, 1)
@@ -1037,7 +1037,7 @@ class TestGeneratePackets(unittest.TestCase): #generate_packets
 		
 		#Compare output
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: ' + str(hash(str(0))) + '\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: 0\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 1\nPayload: 0\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: 0\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 1\nPayload: 0\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(packet_output[0], expected)
 		self.assertEqual(total_size, 1)		
@@ -1074,7 +1074,7 @@ class TestGeneratePackets(unittest.TestCase): #generate_packets
 			sys.stdout = prev_stdout
 
 			expected_1 = 'No Hierarchical Name!\n'
-			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(num_packets) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: ' + str(size) + '\nPayload: ' + str(x) + '\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(num_packets) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: ' + str(size) + '\nPayload: ' + str(x) + '\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 			expected = expected_1 + expected_2
 			self.assertEqual(packet_output[x], expected)
 		self.assertEqual(total_size, size)	
@@ -1141,7 +1141,7 @@ iperf Done.
 			expected_1 = 'No Hierarchical Name!\n'
 			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(len(new_packets)) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: ' + str(size) + '\nPayload: '
 			expected_3 = payload[x]
-			expected_4 = '\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			expected_4 = '\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 			expected = expected_1 + expected_2 + expected_3 + expected_4
 			self.assertEqual(packet_output[x], expected)
 		self.assertEqual(total_size, size)
@@ -1209,7 +1209,7 @@ iperf Done.
 			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: ' + str(hash(payload[x])) + '\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
 			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(len(new_packets)) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: ' + str(size) + '\nPayload: '
 			expected_3 = payload[x]
-			expected_4 = '\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			expected_4 = '\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 			expected = expected_1 + expected_2 + expected_3 + expected_4
 			self.assertEqual(packet_output[x], expected)
 		self.assertEqual(total_size, size)		
@@ -1459,7 +1459,7 @@ class TestPrecacheHelper(unittest.TestCase): #precache_packet_helper
 		sys.stdout = prev_stdout
 		
 		expected_1 = 'No Hierarchical Name!\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: 2\nPrecache: True\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: 2\nPrecache: True\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, ("Expected link failure! Sending via Infrastructure!\nPrecaching from cache!"))
 		self.assertEqual(NDNsim.num_pro_del, 1)
@@ -1519,7 +1519,7 @@ class TestPrecacheHelper(unittest.TestCase): #precache_packet_helper
 		sys.stdout = prev_stdout
 		
 		expected_1 = 'No Hierarchical Name!\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: 2\nPrecache: True\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: 2\nPrecache: True\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, ("Precaching from producer!"))
 		self.assertEqual(NDNsim.num_pro_del, 1)
@@ -1582,7 +1582,7 @@ class TestSendPacket(unittest.TestCase): #send_packet
 	
 		#Check value
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: close\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		self.assertEqual(NDNsim.num_failure, 0)
@@ -1620,7 +1620,7 @@ class TestSendPacket(unittest.TestCase): #send_packet
 			else:
 				packet.name.hierarchical_component = 'close'
 				expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: close\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-			expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: ' + str(x) + '\nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: ' + str(x) + '\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 			expected = expected + expected_1 + expected_2 + "\n"
 			NDNsim.send_packet(ip, src_port, dest_port, packet, False, "0, 0", ["uniform", "0, 0.5"])
 		t1.join()
@@ -1712,7 +1712,7 @@ class TestPrecache(unittest.TestCase): #precache
 		for x in range(5):
 			new_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='hello'), counter=x))
 			expected_1 = '\nPacket ' + str(x) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: hello\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-			expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
 			expected = expected + expected_1 + expected_2
 		expected = expected + 'Cache Entry Info End\n'
 		NDNsim.precache(node_1, new_packets)
@@ -1753,7 +1753,7 @@ class TestPrecache(unittest.TestCase): #precache
 			expected = expected + 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
 			for y in range(5):
 				expected_1 = '\nPacket ' + str(y) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-				expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+				expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
 				expected = expected + expected_1 + expected_2
 				temp_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name=str(x)), counter=y))
 			node_1.cache.append(NDNsim.Cache_Entry(NDNsim.Hybrid_Name(device_name=str(x)), temp_packets))
@@ -1765,7 +1765,7 @@ class TestPrecache(unittest.TestCase): #precache
 		for x in range(5):
 			new_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='hello'), counter=x))
 			expected_1 = '\nPacket ' + str(x) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: hello\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-			expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
 			expected = expected + expected_1 + expected_2
 		expected = expected + 'Cache Entry Info End\n'
 		NDNsim.precache(node_1, new_packets)
@@ -1806,7 +1806,7 @@ class TestPrecache(unittest.TestCase): #precache
 			expected = expected + 'Cache Entry Info Start\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
 			for y in range(5):
 				expected_1 = '\nPacket ' + str(y) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-				expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+				expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
 				expected = expected + expected_1 + expected_2
 				temp_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name=str(x)), counter=y))
 			node_1.cache.append(NDNsim.Cache_Entry(NDNsim.Hybrid_Name(device_name=str(x)), temp_packets))
@@ -1856,9 +1856,9 @@ class TestPrecache(unittest.TestCase): #precache
 				expected_1 = '\nPacket ' + str(y) + '\nHierarchical Name Info Start\nTask: actionOn\nDevice Name: ' + str(x) + '\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
 				expected_2 = ''
 				if x == 3:
-					expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 999\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+					expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 999\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
 				else:
-					expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
+					expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0\n'
 				expected = expected + expected_1 + expected_2
 				temp_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name=str(x)), counter=y))
 			node_1.cache.append(NDNsim.Cache_Entry(NDNsim.Hybrid_Name(device_name=str(x)), temp_packets))
@@ -1937,7 +1937,7 @@ class TestInterestPacketNext(unittest.TestCase): #interest_packet_next
 		sys.stdout = prev_stdout	
 		
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 2.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: [2]\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		self.assertEqual(next_node, [1])	
@@ -2046,11 +2046,102 @@ class TestInterestPacketNext(unittest.TestCase): #interest_packet_next
 		sys.stdout = prev_stdout	
 		
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 100\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 2.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: [2]\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		self.assertEqual(next_node, [1])	
-				
+	
+	#-------------------------------------
+	#Test sending packet twice for 2 lambdas (64)
+	#-------------------------------------
+	def test_interest_multiple_lambda(self):
+		node_1 = NDNsim.Node()
+		node_2 = NDNsim.Node()
+		packet = NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='100', hierarchical_component='VA/Fairfax/GMU/CS'))
+		node_1.FIB = ['VA', 'VA/Fairfax/', 'Hello/Fairfax/GMU/CS', 'NA'] #match with [1]
+		node_1.weights = [1, 2, 3, 4] #match with [1]
+		node_2.FIB = ['VA', 'Hello/Fairfax/GMU/CS', 'VA/Fairfax/', 'NA'] #match with [2]
+		node_2.weights = [1, 2, 3, 4] #match with [2]
+		
+		new_packets, next_node = NDNsim.interest_packet_next(node_1, packet, 0)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.PIT)):
+			node_1.PIT[x].print_info()
+			print("")
+
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 100\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Total Counter: 0\nIncoming Interface: 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 100\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: [2]\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(next_node, [1])		
+
+		new_packets, next_node = NDNsim.interest_packet_next(node_2, new_packets[0], 1)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		for x in range(len(node_1.PIT)):
+			node_2.PIT[x].print_info()
+			print("")
+
+		#Grab print
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 100\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Total Counter: 0\nIncoming Interface: 1'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+
+		#Grab print		
+		for x in range(len(new_packets)):
+			new_packets[x].print_info()
+		output = out.getvalue().rstrip()
+
+		#Redirect STD
+		sys.stdout = prev_stdout	
+		
+		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 100\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: [2, 3]\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected = expected_1 + expected_2
+		self.assertEqual(output, expected)
+		self.assertEqual(next_node, [2])						
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
@@ -2059,7 +2150,7 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 	print("Starting Data Packet Next Tests")	
 	maxDiff = None
 	#-------------------------------------
-	#Test empty PIT, no precache forwarding (64)
+	#Test empty PIT, no precache forwarding (65)
 	#-------------------------------------
 	def test_data_empty_pit(self):
 		node_1 = NDNsim.Node()
@@ -2070,7 +2161,7 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 		self.assertEqual(next_node, [])	
 		
 	#-------------------------------------
-	#Test non empty PIT, no precache forwarding, 1 matching entry (65)
+	#Test non empty PIT, no precache forwarding, 1 matching entry (66)
 	#-------------------------------------
 	def test_data_1_match(self):
 		node_1 = NDNsim.Node()
@@ -2116,13 +2207,13 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 		sys.stdout = prev_stdout	
 		
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		self.assertEqual(next_node, [4])	
 
 	#-------------------------------------
-	#Test non empty PIT, no precache forwarding, 2 matching entry (66)
+	#Test non empty PIT, no precache forwarding, 2 matching entry (67)
 	#-------------------------------------
 	def test_data_2_match(self):
 		node_1 = NDNsim.Node()
@@ -2169,13 +2260,13 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 		sys.stdout = prev_stdout	
 		
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected + "\n" + expected)
 		self.assertEqual(next_node, [4, 7])	
 		
 	#-------------------------------------
-	#Test non empty PIT, no precache forwarding, 1 matching entry, total_packets (67)
+	#Test non empty PIT, no precache forwarding, 1 matching entry, total_packets (68)
 	#-------------------------------------
 	def test_data_1_match_total_size(self):
 		node_1 = NDNsim.Node()
@@ -2223,7 +2314,7 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 		sys.stdout = prev_stdout	
 		
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 2\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 2\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		self.assertEqual(next_node, [4])
@@ -2267,13 +2358,13 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 		sys.stdout = prev_stdout	
 		
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 2\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : 2\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		self.assertEqual(next_node, [4])		
 	
 	#-------------------------------------
-	#Test precache forwarding (68)
+	#Test precache forwarding (69)
 	#-------------------------------------
 	def test_data_precache(self):
 		node_1 = NDNsim.Node(number=1)
@@ -2296,7 +2387,7 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 		sys.stdout = prev_stdout	
 		
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: 7\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: 7\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		self.assertEqual(next_node, [2])
@@ -2319,7 +2410,7 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 		sys.stdout = prev_stdout	
 		
 		expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1\nData Hash: \nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
-		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: 0.0\nDestination: 1\nPrecache: False\nNumber (for grouping): 0'
+		expected_2 = 'Time packet sent: 0.0\nTotal Packets : -1\nCounter: -1\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: \nLambda: []\nDestination: 1\nPrecache: False\nNumber (for grouping): 0'
 		expected = expected_1 + expected_2
 		self.assertEqual(output, expected)
 		self.assertEqual(next_node, [-1])
