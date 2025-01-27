@@ -43,7 +43,7 @@ Install pip and the following libraries if they are not already present:
 sudo apt install python3-pip
 sudo pip3 install pickle5
 sudo apt-get install python3-scipy
-sudo pip install numpy
+sudo pip3 install numpy
 ```
 
 
@@ -105,7 +105,7 @@ The program NDNsim.py contains 16 arguments for the NDN simulator.
 
 | cmd line option    | Default	| Format | Description |
 | --------- | --------- | --------- |  --------- | 
-| -ip, --ip	| 'localhost' | IP address | IP for the topology (computer simulated nodes). |
+| -ihn, --interest_hybrid_name | 'VA/Fairfax/GMU/CS/actionOn:1R153AN' | Hybrid Name | The hybrid name of the requested data. Default is 'VA/Fairfax/GMU/CS/actionOn:1R153AN' and is able to be satisfied on the third node of the default topology. |
 | -ip, --ip	| 'localhost' | IP address | IP for the topology (computer simulated nodes). |
 | -port, --port	| '8080' | port number | Starting port number for the topology (computer simulated nodes). |
 | -pip, --phone_ip	| '192.168.1.207' | IP address | IP for the mobile consumer. |
@@ -370,44 +370,13 @@ Stores the information for a Node, including attributes for the node's IP and po
 
 ##### Topology
 
-Stores information on the NDN topology, including attributes for the topology file, the probability distribution that determines the transmission rates of all links in the topology, the probability distribution that determines the transmission range of each node in the topology and the IP and port. It additionally has a function for reading the 
-
-#### Functions
-
-##### print_info_helper
-
-##### distribution_helper
-
-##### generate_packets
-
-##### next_gateway
-
-##### calc_linger
-
-##### gen_N_random_values
-
-##### dijkstras
-
-##### precache_packet_helper
-
-##### send_packets
-
-##### precache
-
-##### interest_packet_next
-
-##### data_packet_next
-
-##### shutdown_nodes
-
-##### socket_code
-
-##### service_connection
-
-##### readargs
-
-#### Main
+Stores information on the NDN topology, including attributes for the topology file, the probability distribution that determines the transmission rates of all links in the topology, the probability distribution that determines the transmission range of each node in the topology and the IP and port. It has a read_in_file() function for reading the topology file, creating all the Node objects, assigning each node a transmission range, assigning each link in the topology a transmission rate, and creating FIB entries for each node. It additionally has a print_info() function to display this information.
 
 ### Unit Tests
 
 Unit tests are included for the various functions in NDNsim.py in the `unit_tests` folder. If the program is modified, please refer to the unit tests.
+
+It is recommended to run the unit tests after downloading the repo to make sure that everything works as expected. To run the unit tests, use the following command. 
+```
+./unit_tests/run_tests.sh
+```
