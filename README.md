@@ -41,11 +41,17 @@ sudo apt-get install python3
 Install pip and the following libraries if they are not already present:
 ```
 sudo apt install python3-pip
-sudo pip3 install pickle5
 sudo apt-get install python3-scipy
 sudo pip3 install numpy
 ```
 
+If there is an error, you may need to create a virtual environment in order to install numpy. Please replace `USERNAME` with your machine's name.
+```
+sudo apt install python3.12-venv
+python3 -m venv /home/USERNAME/venv
+source /home/USERNAME/venv/bin/activate
+/home/USERNAME/venv/bin/pip3 install numpy
+```
 
 ### Iperf3 Installation
 
@@ -62,17 +68,20 @@ Installation instructions: https://stackoverflow.com/questions/34556884/how-to-i
 
 Official installation instructions: https://developer.android.com/studio/install
 
-Install latest version: 
-```
-sudo apt install android-sdk
-```
+1. download tar file for android studio
+2. extract file contents
+3. in `home/USERNAME/android-studio/bin/` execute:
+   ```
+   ./studio.sh
+   ```
+4. Follow default installation process.
 
 The version used for this simulation is Studio Koala Feature Drop | 2024.1.2 which is available on the Android SDK website https://developer.android.com/studio/archive
 
 
 #### Android Application Configuration
 
-After installation, run Android SDK by either clicking on the application or navigating to the `android-studio/bin/` and executing `./studio.sh`
+To run Android SDK by either clicking on the application or navigating to the `android-studio/bin/` and executing `./studio.sh`
 
 Select start a new project. This can be done under the file tab on the upper right, or it should be immediately recommended once it is installed.
 
@@ -93,6 +102,8 @@ Next, replace the contents of `app/res/layout/activity_main.xml` , `app/java/com
 This implementation was adapted and modified from this template server socket code from Jennifer Nicholas https://www.tutorialspoint.com/sending-and-receiving-data-with-sockets-in-android
 
 It should be noted that the Android Application will not be able to be utilized without a **physical Android Device**, as the scope of the network on the Android Device Emulator does not reach outside the emulator, and therefore will not be able to connect to the Python program on PC. 
+
+As an additional note, if you are using a virtual machine to install Android Studio, the Android device emulator will not work as it does not allow a virtual machine within a virtual machine. 
 
 To run the application on your Android device, **USB debugging** must be enabled. Typically, this can be done by going into `Settings > System > Developer Options > USB Debugging` on your Android device. For specific Android version instructions: https://developer.android.com/studio/debug/dev-options#Enable-debugging
 
@@ -380,3 +391,5 @@ It is recommended to run the unit tests after downloading the repo to make sure 
 ```
 ./unit_tests/run_tests.sh
 ```
+
+Note: depending on your version of numpy and python, some unit tests may fail due to typcasting of numpy array elements (ie: np.float(0.0) VS 0.0)
