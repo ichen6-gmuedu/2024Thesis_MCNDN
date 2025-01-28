@@ -157,9 +157,7 @@ To run with the Android Device, first run the Android application using the **de
 
 The physical Android device should open the application automatically. On the application, the screen should display an IP, port, and "Not Connected" at the top and a textbox, a button that says "SEND CUSTOM INTEREST", a button that says "SEND DEFAULT INTEREST", and a button that says "CLEAR SCREEN" at the bottom. 
 
-```
-IMAGE HERE
-```
+![phone_notconnected](/readme_images/phone_notconnected.png "phone_notconnected")
 
 The Phone's IP may be different depending on your network connection, so please have the Phone IP `-pip` and Phone Port `-pport` CLI reflect the IP displayed on your Android Device. It should be noted that simply 'localhost' will not work. Additionally, make sure the phone_test `-pt` toggle is on.
 
@@ -169,17 +167,14 @@ python3 NDNsim.py -pip 'DISPLAYED_IP' --port 'DISPLAYED_PORT' -pt True
 
 Unless you are waiting for iperf3 to generate data, the text on the Android App should now read "Connected". Now that it is connected, tap the "SEND DEFAULT INTEREST" button to begin the NDN simulator.
 
-```
-IMAGE HERE
-```
+![phone_connected](/readme_images/phone_connected.png "phone_connected")
 
 Once the simulator is complete, which should only take a few seconds, you should see the requested data displayed on the phone screen. This should be dummy data (The numbers 0, 1, 2, 3, 4) or the generated iperf3 data if the toggle was turned on `-ipt True`.
 
-```
-IMAGE HERE
-```
+![phone_defaultinterest](/readme_images/phone_defaultinterest.png "phone_defaultinterest")
 
-To send interest packets with a custom hybrid name, type your custom hybrid name into the text box and tap "SEND CUSTOM INTEREST" when you are done. If the requested data name is formatted incorrectly, you should see a message that tells you so. 
+
+To send interest packets with a custom hybrid name, type your custom hybrid name into the text box and tap "SEND CUSTOM INTEREST" when you are done. If the requested data name is formatted incorrectly, and there is a path to the requested data in the topology via the FIBs, then you should see a message that tells you so. 
 
 The hierarchical name for an interest packet is formatted with `/` separating the name sectinos and `:` separating the flat component. The following graphic is taken from "Hierarchical and Flat-Based Hybrid Naming Scheme in Content-Centric Networks of Things" by Arshad and Shahzaad et al., 2018. For the interest packet, only the interest message format is needed as input. 
 
@@ -187,9 +182,7 @@ The hierarchical name for an interest packet is formatted with `/` separating th
 
 If the requested data name is formatted correctly and present in the topology with a node being able to satisfy the request, then you should be able to see the output with default the CLI. 
 
-```
-IMAGE HERE
-```
+![phone_custominterest](/readme_images/phone_custominterest.png "phone_custominterest")
 
 ### Configuring BASH script for Bulk Executions
 
@@ -234,6 +227,8 @@ To create your own topology file, follow the this guide:
 4. Each element in a row is separated by a tab character.
 5. The Hierarchical component of the data a neighboring node is able to satisfy is the FIB entry for that node
 6. If there is no neighboring node for the corresponding element, then it is a 0.
+
+A note about the default topology: the third node is the only node that is guaranteed to have a path towards it, as the hierarchical components of the other nodes were created in service of it. If an interest packet's requested data name has a hierarchical component of "VA/Fairfax" it would not always be able to find a path towards the node that satisfies that data. This simulator currently supports nodes that satisfy only one data name and FIB entries that have only one data name for each neighboring node. 
 
 ## Expected Results
 
@@ -298,11 +293,22 @@ However, even though the data was proactively cached, the data was also sent bac
 
 To test with the physical Android device, `-pt` must be true, and the `-pport` and `-pip` must reflect the IP address and port displayed on the physical Android device. 
 
-Running the above previous tests with these additional command line inputs should result in the same output for NDNsim.py, but should additionally have these outputs for the Android Application.
+Running the previous tests with these additional command line inputs should result in the same output for NDNsim.py, but should additionally have these two outputs for the Android Application when sending the default interest. The only difference being no response if the 
 
 ```
-Include 5 screenshots of phone outputs.
+python3 NDNsim.py -seed 1 -pt true
 ```
+![phone_defaultinterest](/readme_images/phone_defaultinterest.png "phone_defaultinterest")
+
+```
+python3 NDNsim.py -seed 1 -fd "uniform:0, 0.5" -fr "1, 1" -pt true
+```
+![phone_failed](/readme_images/phone_failed.png "phone_failed")
+
+```
+python3 NDNsim.py -seed 1 -ipt true -pt true
+```
+![phone_iperf3](/readme_images/phone_iperf3.png "phone_iperf3")
 
 ### Output file 
 

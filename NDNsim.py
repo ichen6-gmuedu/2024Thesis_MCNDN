@@ -671,6 +671,8 @@ def interest_packet_next(node: Node, packet: Packet, previous_node: int) -> (lis
 	for x in range(len(node.FIB)):
 		value = 0
 		for y in range(len(node.FIB[x])):
+			if len(packet_name) <= y:
+				break
 			if node.FIB[x][y] == packet_name[y]:
 				value = value + 1
 			else:
@@ -1340,6 +1342,8 @@ if __name__ == "__main__":
 				break
 	else:
 		precache_check = False
+		if phone_test:
+				phone_client.send(("**NDN_sim.py failed to send requested data.\n").encode('utf-8'))
 	
 	# close phone socket
 	if phone_test: 
@@ -1363,7 +1367,7 @@ if __name__ == "__main__":
 							print("")
 						print("\n\n")
 				empty = False
-		if pit_time+45 < time.time() and not empty:
+		if pit_time+20 < time.time() and not empty:
 			print("Continuing with shutdown with PIT entries still present!") 
 		if empty == True:
 			break
