@@ -293,7 +293,7 @@ However, even though the data was proactively cached, the data was also sent bac
 
 To test with the physical Android device, `-pt` must be true, and the `-pport` and `-pip` must reflect the IP address and port displayed on the physical Android device. 
 
-Running the previous tests with these additional command line inputs should result in the same output for NDNsim.py, but should additionally have these two outputs for the Android Application when sending the default interest. The only difference being no response if the 
+Running the previous tests with these additional command line inputs should result in the same output for NDNsim.py, but should additionally have these two outputs for the Android Application when sending the default interest. In the following examples, there is the default behavior with generated data, the behavior if the NDNsim.py fails to deliver the final data, and default behavior with iperf3 data.
 
 ```
 python3 NDNsim.py -seed 1 -pt true
