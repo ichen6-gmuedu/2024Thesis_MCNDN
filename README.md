@@ -345,7 +345,7 @@ The output file is `metric_outfile.csv` by default and records the inputs of the
 | delta_timeout_counter | int | Number of Delta Timeouts of the test. |
 | internal_timeout_counter | int | Number of Internal Timeouts  of the test. |
 | num_failure | int | Number of Link Failures of the test. |
-| dropped_packets_percent | percent | Percent of Dropped Packets of the test. Can occur due to link failure or timeouts. |
+| dropped_packets | int | Number of Dropped Packets of the test. Can occur due to link failure or packets received after a deadline. |
 | rec_data | True or False | Whether or not all of the data was successfully received by the Mobile Consumer. |
 | precache_check | True or False | Whether or not the successful recieving of data was due to a cache hit from precaching. |
 | num_pro_del | int | Number of Proactive Deliveries, where it was expected for a linger time timeout to occur at the original node, and precaching had begun. |

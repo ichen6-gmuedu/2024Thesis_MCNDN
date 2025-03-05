@@ -1474,7 +1474,7 @@ if __name__ == "__main__":
 			for y in range(len(packet_drop[x])):
 				if packet_drop[x][y] > timeout_time[x]:
 					local_counter = local_counter + 1
-			dropped_counter = dropped_counter + local_counter
+			to_dropped_counter = to_dropped_counter + local_counter
 			if logging >= 1:
 				print("Interest " + str(x) + " had " + str(local_counter) + "/" + str(len(packet_drop[x])) + " packets drop")
 			counter = counter + 1
