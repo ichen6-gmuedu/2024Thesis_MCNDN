@@ -357,12 +357,12 @@ def print_info_helper(value):
 	print_lock.release()
 	
 #-------------------------------------------------------------------------------
-#Distribution helper
+#Distribution helper 
 def distribution_helper(distribution: str, values: list, cdf: bool) -> float:
 
 	if distribution == "uniform":
 		if values[1] < values[0]:
-			print("Error! Maximum value larger than minimum value")
+			print("Error! Maximum value smaller than minimum value")
 			exit(1)
 		number = uniform.rvs(values[0], values[1]-values[0]) # expected values are lower bounds and range (upper bounds + lower bounds)
 		if cdf == False:
@@ -730,7 +730,35 @@ def data_packet_next(node: Node, packet: Packet) -> (list, list):
 		new_packets.append(packet)
 		
 	return new_packets, next_node
+
+#-------------------------------------------------------------------------------
+# sort the final data
+# returns whether or not the data was received via precached 
+def sort_data(data: list) -> (list, bool):
+	precache_check = True
+	sorted_final_data = []
+	sort_counter = 0
 		
+	while len(data) != 0:
+		for y in range(len(data)):
+			if data[y].counter == sort_counter:
+				sorted_final_data.append(data[y])
+				sort_counter = sort_counter + 1
+				if data[y].precache == False:
+					precache_check = False
+				del data[y]
+				break
+	
+	# print final data
+	if logging >= 2:
+		print("Data hash:", sorted_final_data[0].name.data_hash)
+		print("Final Data: \n", end = "") 
+		for x in range(len(sorted_final_data)):
+			print(sorted_final_data[x].payload, end='') 
+		print("")
+
+	return sorted_final_data, precache_check
+	
 #-------------------------------------------------------------------------------	
 # close threads
 # sends 'close' message to all nodes until all nodes and threads are closed
@@ -746,7 +774,7 @@ def shutdown_nodes(ip: str, src_port: int, dest_port: int, thread_list: list):
 # Given a node, open server sockets to listen for connections
 # When packet is received, close socket and Thread to process the packet
 # When 'close' is receieved, shutdown the socket and child threads
-def socket_code(node, pktgen_num, top_thresh, client, success_thresh, link_dist, phone_node_connect_order, num_nodes, ip, port):
+def socket_code(node: Node, pktgen_num: int, top_thresh: list, client: str, success_thresh: list, link_dist: list, phone_node_connect_order: list, num_nodes: int, ip: str, port: int):
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # allows us to reuse socket for next run
 		s.bind((node.IP, node.port))
@@ -778,7 +806,7 @@ def socket_code(node, pktgen_num, top_thresh, client, success_thresh, link_dist,
 #-------------------------------------------------------------------------------
 # Service connection
 # When a packet has been receivd at a node, we process it
-def service_connection(packet, node, previous_node, pktgen_num, top_thresh, client, success_thresh, link_dist, phone_node_connect_order, num_nodes, ip, port):
+def service_connection(packet: Packet, node: Node, previous_node: int, pktgen_num: int, top_thresh: list, client: str, success_thresh: list, link_dist: list, phone_node_connect_order: list, num_nodes: int, ip: str, port: int):
 	global node_init, final_data, num_cache_hit, packet_drop, num_precache
 	ret_Fail = True
 	
@@ -837,18 +865,17 @@ def service_connection(packet, node, previous_node, pktgen_num, top_thresh, clie
 				num_cache_hit_lock.release()
 				node.cache_lock.acquire()
 				local_cache = node.cache[cache_hit]
-				final_data_lock.acquire()
+				node.cache_lock.release()
 				for x in range(len(local_cache.packets)): # appending cached data packets
 					temp_packet = deepcopy(local_cache.packets[x])
 					temp_packet.number = packet.number #corresponds with packet that triggered cache hit
+					temp_packet.destination = -1 #no longer precached data
 					new_packets.append(temp_packet)
 					next_node.append(previous_node) #always send back (clear PITs)
-				final_data_lock.release()
 				total_size = local_cache.packets[0].total_size #Precache	
-				node.cache_lock.release()
 					
 			else: # Not a cache hit, append node's data as payload in packet and add data_hash to data_name
-				if logging == 2:
+				if logging >= 2:
 					print("Reached Producer")
 				new_packets, total_size = generate_packets(packet, pktgen_num, client) # generates data packets to be sent
 				for x in range(len(new_packets)):
@@ -862,6 +889,8 @@ def service_connection(packet, node, previous_node, pktgen_num, top_thresh, clie
 				reversepath_timecalc = reversepath_timecalc + (total_size * packet.lambda_[x])
 			#Precache
 			if not (reversepath_timecalc + (time.time()-packet.time) < packet.alpha):
+				if logging >= 2:
+					print("Precaching!")
 				packets_to_append, nodes_to_append, ret_Fail = precache_packet_helper(location, node, packet, new_packets, top_thresh, success_thresh, phone_node_connect_order)
 				new_packets = new_packets + packets_to_append
 				next_node = next_node + nodes_to_append
@@ -998,6 +1027,12 @@ def readargs():
 		Eg: \"uniform:0, 0.5\" means that at each node the mobile consumer is connecting to,\n\
 		they are in range of that node for x seconds as determined by the uniform probability distribution between 0 and 0.5.")		
 		
+	p.add_argument("-mrt", "--MC_reconn_time", type = str, default = "uniform:1, 5",
+		help = "\"distribution:distrubution values\"\n\
+		The probability distribution that determines how long (in seconds) the MC will take before reconnecting to the next node after a linger timeout occurs.\n\
+		Eg: \"uniform:0, 0.5\" means that after a linger timeout occurs, the MC will take x seconds (as determined by the uniform probability distribution between 0 and 0.5)\n\
+		before re-connecting to the next node and sending a new interest packet.")		
+		
 	p.add_argument("-d", "--delta", type = str, default = "3:uniform:1, 5",
 		help = "\"number_to_gen:distribution:distrubution values\"\n\
 		The probability distribution of deadline in seconds before the data expires.\n\
@@ -1043,6 +1078,8 @@ def readargs():
 	weightdist = args.weights.split(":")
 	linger_dist = args.linger.split(":")
 	trans_range_dist = args.range.split(":")
+	MC_recon_time = args.MC_reconn_time.split(":")
+	MC_recon_time[1] = list(map(float, MC_recon_time[1].split(", ")))
 	
 	# link failure distribution and probability threshold
 	link_dist = args.link_dist.split(":")
@@ -1094,6 +1131,7 @@ def readargs():
 	"\" -v \"" +args.velocity+ \
 	"\" -pgn \"" +str(args.pktgen_num)+ \
 	"\" -tt \""+args.top_thresh+ \
+	"\" -mrt \"" +args.MC_reconn_time + \
 	# timeouts/deadlines
 	"\" -l \"" +args.linger+ \
 	"\" -d \"" +args.delta+ \
@@ -1112,14 +1150,14 @@ def readargs():
 		print("linger_dist:", linger_dist)
 		print("delta:", delta)
 		#note: failure distribution, success threshhold, and infrastructure threshhold are rerolled at the moment.
-	return args, ip, port, phone_ip, phone_port, args.topfile, weightdist, args.outfile, args.pktgen_num, args.timeout, velocity, delta, linger_dist, trans_range_dist, top_thresh, success_thresh, link_dist, phone_test, iperf_test, phone_node_connect_order
+	return args, ip, port, phone_ip, phone_port, args.topfile, weightdist, args.outfile, args.pktgen_num, args.timeout, velocity, delta, linger_dist, trans_range_dist, top_thresh, success_thresh, link_dist, phone_test, iperf_test, phone_node_connect_order, MC_recon_time
 
 #-------------------------------------------------------------------------------
 # MAIN
 if __name__ == "__main__":
 
 	#Read in CLIs
-	args, ip, port, phone_ip, phone_port, topfile, weightdist, metrics_outfile, pktgen_num, timeout, velocity, delta, linger_dist, trans_range_dist, top_thresh, success_thresh, link_dist, phone_test, iperf_test, phone_node_connect_order = readargs()
+	args, ip, port, phone_ip, phone_port, topfile, weightdist, metrics_outfile, pktgen_num, timeout, velocity, delta, linger_dist, trans_range_dist, top_thresh, success_thresh, link_dist, phone_test, iperf_test, phone_node_connect_order, MC_recon_time = readargs()
 	
 	
 	# starts iperf3 server if needed
@@ -1297,9 +1335,12 @@ if __name__ == "__main__":
 				break
 				
 		elif curr_time >= end_time_2:
+			recon_time = distribution_helper(MC_recon_time[0], MC_recon_time[1], False)			
+			
 			if logging >= 2:
-				print("Linger time exceeded!")
+				print("Linger time exceeded! Reconnecting to next node in "+str(recon_time)+" seconds.")
 			timestamp.append("Linger Time Timeout: " + str(alpha))
+			time.sleep(recon_time)  #sleeping for reconnection time
 			timeout_counter = timeout_counter + 1
 			linger_timeout_counter = linger_timeout_counter + 1
 			phone_node_connect_order_counter_lock.acquire()
@@ -1334,47 +1375,21 @@ if __name__ == "__main__":
 
 	# -----
 	# Sort the data
-	precache_check = True
-	sorted_final_data = []
+	sorted_data = []
+	precache_check = False
 	if rec_data == True:
 		final_data_lock.acquire()
 		temp_final_copy = (deepcopy(final_data))[-1]
-		printable_copy = (deepcopy(final_data))[-1]
 		final_data_lock.release()
-		sort_counter = 0
-		
-		while len(temp_final_copy) != 0:
-			for y in range(len(temp_final_copy)):
-				if temp_final_copy[y].counter == sort_counter:
-					sorted_final_data.append(temp_final_copy[y])
-					sort_counter = sort_counter + 1
-					del temp_final_copy[y]
-					break
-		
-		# print final data
-		if logging >= 2:
-			print("Data hash:", sorted_final_data[0].name.data_hash)
-			print("Final Data: \n", end = "") 
-		for x in range(len(sorted_final_data)):
-			if logging >= 2:
-				print(sorted_final_data[x].payload, end='') 
-			# -----
-			# Send the data packet to the phone
-			if phone_test:
-				phone_client.send((sorted_final_data[x].payload).encode('utf-8'))
-		print("")
-		
-		for x in range(len(sorted_final_data)):
-			if sorted_final_data[x].precache == False:
-				precache_check = False
-				break
-	else:
-		precache_check = False
-		if phone_test:
-				phone_client.send(("**NDN_sim.py failed to send requested data.\n").encode('utf-8'))
+		sorted_data, precache_check = sort_data(temp_final_copy)
 	
-	# close phone socket
+	# send the data and close phone socket
 	if phone_test: 
+		if rec_data == True:
+			for x in range(len(sorted_data)):
+				phone_client.send((sorted_data[x].payload).encode('utf-8'))
+		else:
+				phone_client.send(("**NDN_sim.py failed to send requested data.\n").encode('utf-8'))
 		phone_client.close()	
 	
 	# -----
@@ -1458,7 +1473,7 @@ if __name__ == "__main__":
 		print("Number of Link Failures: " + str(num_failure))
 		
 		print("")
-		if timeout_check:
+		if rec_data:
 			print("Successful Delivery due to Cache Hit?: " + str(precache_check))
 		print("Number of Proactive Deliveries: " + str(num_pro_del))
 		print("Number of Deliveries through Infrasctructure: " + str(num_infrastructure))

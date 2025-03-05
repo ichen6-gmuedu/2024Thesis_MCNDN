@@ -2485,6 +2485,7 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 
 #-------------------------------------------------------------------------------
 # UNTESTED
+#class TestSortData(unittest.TestCase): #sort_data() TODO: make sure precache_check works as expected
 #class TestShutdownNodes(unittest.TestCase): #close_threads TODO Mayebe
 #class TestSocketCode(unittest.TestCase): #socket_code
 #class TestServiceConnection(unittest.TestCase): #service_connection
