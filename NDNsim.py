@@ -735,19 +735,39 @@ def data_packet_next(node: Node, packet: Packet) -> (list, list):
 # sort the final data
 # returns whether or not the data was received via precached 
 def sort_data(data: list) -> (list, bool):
-	precache_check = True
-	sorted_final_data = []
-	sort_counter = 0
+	
+	#Grab all the packet counters
+	packet_num = []	
+	for x in range(len(data)):
+		packet_num.append(data[x].counter)
+	
+	#Sort	
+	sorted_final_data = [x for _,x in sorted(zip(packet_num,data), key=lambda pair: pair[0])]
 		
-	while len(data) != 0:
-		for y in range(len(data)):
-			if data[y].counter == sort_counter:
-				sorted_final_data.append(data[y])
-				sort_counter = sort_counter + 1
-				if data[y].precache == False:
-					precache_check = False
-				del data[y]
-				break
+	#Make sure all the sorted data is correct
+	precache_check = True
+	error = False
+	for x in range(len(sorted_final_data)):
+		if sorted_final_data[x].counter != x: #error if packet number is incorrectly incrementing
+			print("Error! Packet counter is not correct!")
+			error = True
+		if sorted_final_data[x].number != sorted_final_data[0].number: #error if all group numbers are not the same
+			print("Error! Packet number is not correct!")
+			error = True
+		if sorted_final_data[x].total_packets != len(sorted_final_data):
+			print("Error! Number of total packets is not consistent!")
+			error = True
+		if error:
+			break
+		if sorted_final_data[x].precache == False:
+			precache_check = False
+	
+	#If an error occured, print out the packets and exit
+	if error:	
+		for x in range(len(sorted_final_data)): 
+			sorted_final_data[x].print_info()
+			print("")
+		exit(1)
 	
 	# print final data
 	if logging >= 2:
@@ -882,15 +902,12 @@ def service_connection(packet: Packet, node: Node, previous_node: int, pktgen_nu
 					next_node.append(previous_node) #always send back
 				location = "producer"
 
-			
 			# Calculating the time to deliver data via reverse path
 			reversepath_timecalc = 0
 			for x in range(len(packet.lambda_)):
 				reversepath_timecalc = reversepath_timecalc + (total_size * packet.lambda_[x])
 			#Precache
 			if not (reversepath_timecalc + (time.time()-packet.time) < packet.alpha):
-				if logging >= 2:
-					print("Precaching!")
 				packets_to_append, nodes_to_append, ret_Fail = precache_packet_helper(location, node, packet, new_packets, top_thresh, success_thresh, phone_node_connect_order)
 				new_packets = new_packets + packets_to_append
 				next_node = next_node + nodes_to_append
@@ -1027,7 +1044,7 @@ def readargs():
 		Eg: \"uniform:0, 0.5\" means that at each node the mobile consumer is connecting to,\n\
 		they are in range of that node for x seconds as determined by the uniform probability distribution between 0 and 0.5.")		
 		
-	p.add_argument("-mrt", "--MC_reconn_time", type = str, default = "uniform:1, 5",
+	p.add_argument("-mrt", "--MC_reconn_time", type = str, default = "uniform:0, 0",
 		help = "\"distribution:distrubution values\"\n\
 		The probability distribution that determines how long (in seconds) the MC will take before reconnecting to the next node after a linger timeout occurs.\n\
 		Eg: \"uniform:0, 0.5\" means that after a linger timeout occurs, the MC will take x seconds (as determined by the uniform probability distribution between 0 and 0.5)\n\
@@ -1443,7 +1460,7 @@ if __name__ == "__main__":
 		# prints number of timeouts for each interest packet
 		print("Number of timeouts that happened: " + str(timeout_counter))
 		print("")
-	dropped_counter = 0
+	to_dropped_counter = 0
 	total_data_counter = 0
 	for x in range(len(final_data)):
 		total_data_counter = total_data_counter + len(final_data[x])
@@ -1451,7 +1468,6 @@ if __name__ == "__main__":
 	if total_data_counter == 0:
 		if logging >= 1:
 			print("No data packets recieved!")
-		percent_dropped = None
 	else:
 		for x in range(len(timeout_time)):
 			local_counter = 0
@@ -1465,12 +1481,9 @@ if __name__ == "__main__":
 		if len(timeout_time) != len(final_data):
 			if logging >= 1:
 				print("Interest " + str(counter) + " had 0/" + str(len(final_data[counter])) + " packets drop")
-		percent_dropped = dropped_counter/total_data_counter*100
-		if logging >= 1:
-			print("Percentage of dropped packets: " + str(percent_dropped) + "%")
-	
 	if logging >= 1:		
 		print("Number of Link Failures: " + str(num_failure))
+		print("Number of Packets Dropped (link failure + timeouts): " + str(num_failure + to_dropped_counter))
 		
 		print("")
 		if rec_data:
@@ -1513,7 +1526,7 @@ Delta_dist, \
 Delta, \
 Timeout, \
 Phone_test, iperf_test, \
-total_delay, timeout_counter, linger_timeout_counter, delta_timeout_counter, internal_timeout_counter, num_failure, dropped_packets_percent, rec_data, precache_check, num_pro_del, num_infrastructure, num_precache, num_cache_hit\n")
+total_delay, timeout_counter, linger_timeout_counter, delta_timeout_counter, internal_timeout_counter, num_failure, dropped_packets, rec_data, precache_check, num_pro_del, num_infrastructure, num_precache, num_cache_hit\n")
 	
 	
 	f.write("\""+args.ip+\
@@ -1545,7 +1558,7 @@ total_delay, timeout_counter, linger_timeout_counter, delta_timeout_counter, int
 	 str(delta_timeout_counter) + ", " + \
 	 str(internal_timeout_counter) + ", " + \
 	 str(num_failure) + ", " + \
-	 str(percent_dropped) + ", " + \
+	 str(num_failure + to_dropped_counter) + ", " + \
 	 str(rec_data) + ", " + \
 	 str(precache_check) + ", " + \
 	 str(num_pro_del) + ", " + \

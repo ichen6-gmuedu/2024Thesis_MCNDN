@@ -1,7 +1,8 @@
 #-------------------------------------------
 # IMPORTS
 
-import unittest, sys, logging, io, socket, pickle
+import unittest, sys, logging, io, socket, pickle, random
+from copy import deepcopy
 import numpy as np
 from threading import Lock, Thread
 sys.path.insert(1, '../')
@@ -2484,9 +2485,202 @@ class TestDataPacketNext(unittest.TestCase): #data_packet_next
 #-------------------------------------------------------------------------------	
 
 #-------------------------------------------------------------------------------
+class TestSortData(unittest.TestCase): #sort_data
+
+	print("Starting Sort Data Tests")	
+	maxDiff = None
+	#-------------------------------------
+	#Test correct sorting without precache check (70)
+	#-------------------------------------
+	def test_sort_data_correct(self):
+		NDNsim.logging = 3
+		num_packets = 5
+		correct_packets = []
+		packet_expected = ""
+		for x in range(num_packets):
+			correct_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1R153AN', hierarchical_component='VA/Fairfax/GMU/CS', data_hash='Hello World'), number=0, counter=x, payload=x, total_packets=num_packets))
+			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: Hello World\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(num_packets) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: ' + str(x) + '\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			packet_expected = packet_expected + expected_1 + expected_2
+		
+		#Shuffle the data
+		random.seed(1) #Setting seeds for shuffle
+		incorrect_packets = deepcopy(correct_packets)
+		random.shuffle(incorrect_packets)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		#Sort the data
+		sorted_final_data, precache_check = NDNsim.sort_data(incorrect_packets)
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual("Data hash: Hello World\nFinal Data: \n01234", output)	
+		self.assertEqual(precache_check, False)	
+
+	#-------------------------------------
+	#Test correct sorting with precache check (71)
+	#-------------------------------------
+	def test_sort_data_correct_precache(self):
+		NDNsim.logging = 3
+		num_packets = 5
+		correct_packets = []
+		packet_expected = ""
+		for x in range(num_packets):
+			correct_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1R153AN', hierarchical_component='VA/Fairfax/GMU/CS', data_hash='Hello World'), number=0, counter=x, payload=x, total_packets=num_packets, precache=True))
+			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: Hello World\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(num_packets) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: ' + str(x) + '\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			packet_expected = packet_expected + expected_1 + expected_2
+		
+		#Shuffle the data
+		random.seed(1) #Setting seeds for shuffle
+		incorrect_packets = deepcopy(correct_packets)
+		random.shuffle(incorrect_packets)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		#Sort the data
+		sorted_final_data, precache_check = NDNsim.sort_data(incorrect_packets)
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual("Data hash: Hello World\nFinal Data: \n01234", output)	
+		self.assertEqual(precache_check, True)	
+
+	#-------------------------------------
+	#Test bad counter (72)
+	#-------------------------------------
+	def test_sort_data_incorrect_counter(self):
+		NDNsim.logging = 3
+		num_packets = 5
+		correct_packets = []
+		packet_expected = ""
+		for x in range(num_packets):
+			
+			#2 packets with counter 3
+			y = x
+			if x == 2:
+				y = x+1
+				
+			correct_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1R153AN', hierarchical_component='VA/Fairfax/GMU/CS', data_hash='Hello World'), number=0, counter=y, payload=x, total_packets=num_packets, precache=False))
+			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: Hello World\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(num_packets) + '\nCounter: ' + str(y) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: ' + str(x) + '\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			packet_expected = packet_expected + expected_1 + expected_2
+			if x+1 != num_packets:
+				packet_expected = packet_expected + "\n\n"
+		
+		#Shuffle the data
+		random.seed(1) #Setting seeds for shuffle
+		incorrect_packets = deepcopy(correct_packets)
+		random.shuffle(incorrect_packets)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		#Sort the data
+		with self.assertRaises(SystemExit) as cm:
+			sorted_final_data, precache_check = NDNsim.sort_data(incorrect_packets)
+		self.assertEqual(cm.exception.code, 1)
+			
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual("Error! Packet counter is not correct!\n" + packet_expected, output)	
+
+	#-------------------------------------
+	#Test bad number (73)
+	#-------------------------------------
+	def test_sort_data_incorrect_number(self):
+		NDNsim.logging = 3
+		num_packets = 5
+		correct_packets = []
+		packet_expected = ""
+		for x in range(num_packets):
+			
+			#2 packets with counter 3
+			y = 0
+			if x == 2:
+				y = 1
+				
+			correct_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1R153AN', hierarchical_component='VA/Fairfax/GMU/CS', data_hash='Hello World'), number=y, counter=x, payload=x, total_packets=num_packets, precache=False))
+			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: Hello World\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(num_packets) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: ' + str(x) + '\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): ' + str(y)
+			packet_expected = packet_expected + expected_1 + expected_2
+			if x+1 != num_packets:
+				packet_expected = packet_expected + "\n\n"
+		
+		#Shuffle the data
+		random.seed(1) #Setting seeds for shuffle
+		incorrect_packets = deepcopy(correct_packets)
+		random.shuffle(incorrect_packets)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		#Sort the data
+		with self.assertRaises(SystemExit) as cm:
+			sorted_final_data, precache_check = NDNsim.sort_data(incorrect_packets)
+		self.assertEqual(cm.exception.code, 1)
+			
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual("Error! Packet number is not correct!\n" + packet_expected, output)
+		
+	#-------------------------------------
+	#Test bad total packets (74)
+	#-------------------------------------
+	def test_sort_data_incorrect_total(self):
+		NDNsim.logging = 3
+		num_packets = 5
+		correct_packets = []
+		packet_expected = ""
+		for x in range(num_packets):
+			
+			correct_packets.append(NDNsim.Packet(name=NDNsim.Hybrid_Name(device_name='1R153AN', hierarchical_component='VA/Fairfax/GMU/CS', data_hash='Hello World'), number=0, counter=x, payload=x, total_packets=8, precache=False))
+			expected_1 = 'Hierarchical Name Info Start\nTask: actionOn\nDevice Name: 1R153AN\nData Hash: Hello World\nHierarchical Component: VA/Fairfax/GMU/CS\nFlat Component: 1R153AN\nHierarchical Name Info End\n'
+			expected_2 = 'Time packet sent: 0.0\nTotal Packets : ' + str(8) + '\nCounter: ' + str(x) + '\nAlpha/Linger Time: 0.0\nDelta: 0.0\nVelocity: 0.0\nTotal Size: 0\nPayload: ' + str(x) + '\nLambda: []\nDestination: -1\nPrecache: False\nNumber (for grouping): 0'
+			packet_expected = packet_expected + expected_1 + expected_2
+			if x+1 != num_packets:
+				packet_expected = packet_expected + "\n\n"
+		
+		#Shuffle the data
+		random.seed(1) #Setting seeds for shuffle
+		incorrect_packets = deepcopy(correct_packets)
+		random.shuffle(incorrect_packets)
+		
+		#Redirect STD
+		prev_stdout = sys.stdout
+		out = io.StringIO()
+		sys.stdout = out	
+		
+		#Sort the data
+		with self.assertRaises(SystemExit) as cm:
+			sorted_final_data, precache_check = NDNsim.sort_data(incorrect_packets)
+		self.assertEqual(cm.exception.code, 1)
+			
+		output = out.getvalue().rstrip()
+		
+		#Redirect STD
+		sys.stdout = prev_stdout
+		self.assertEqual("Error! Number of total packets is not consistent!\n" + packet_expected, output)				
+#-------------------------------------------------------------------------------
 # UNTESTED
-#class TestSortData(unittest.TestCase): #sort_data() TODO: make sure precache_check works as expected
-#class TestShutdownNodes(unittest.TestCase): #close_threads TODO Mayebe
+#class TestShutdownNodes(unittest.TestCase): #close_threads
 #class TestSocketCode(unittest.TestCase): #socket_code
 #class TestServiceConnection(unittest.TestCase): #service_connection
 #class TestReadargs(unittest.TestCase): #readargs
