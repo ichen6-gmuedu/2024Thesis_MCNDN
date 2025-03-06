@@ -27,7 +27,7 @@ TIMEOUT=("5")
 PHONE_TEST=("False")
 IPERF_TEST=("False")
 
-for i in $(seq 0 10);
+for i in $(seq 0 9);
 do
 echo "...Testing Baseline"
 python3 NDNsim.py  -seed $i -o "$METRICFILE" -ihn "$INT_HYBRID_NAME" -ip "$IP" -port "$PORT" -pip "$PHONE_IP" -pport "$PHONE_PORT"  -tp "$TOPFILE" -w "$WEIGHTDIST" -r "$RANGE" -ld "$LINKDIST" -st "$SUCCESS_THRESH" -pnco "$PHONE_NODE_CONNECT_ORDER" -v "$VELOCITY" -pgn "$PLTGEN_NUM" -tt "$TOP_THRESH" -l "$LINGER" -d "$DELTA" -to "$TIMEOUT" -log "$LOGGING" -pt "$PHONE_TEST" -ipt "$IPERF_TEST"
@@ -57,7 +57,7 @@ IPERF_TEST=("False")
 for j in $(seq 0 "$(("${#DELTA[@]}"-1))");
 do
 echo "...Testing DELTA: ${DELTA[$j]}"
-	for i in $(seq 0 10);
+	for i in $(seq 0 9);
 	do
 	python3 NDNsim.py -seed $i -o "$METRICFILE" -ihn "$INT_HYBRID_NAME" -ip "$IP" -port "$PORT" -pip "$PHONE_IP" -pport "$PHONE_PORT" -tp "$TOPFILE" -w "$WEIGHTDIST" -r "$RANGE" -ld "$LINKDIST" -st "$SUCCESS_THRESH" -pnco "$PHONE_NODE_CONNECT_ORDER" -v "$VELOCITY" -pgn "$PLTGEN_NUM" -tt "$TOP_THRESH" -l "$LINGER" -d "${DELTA[$j]}" -to "$TIMEOUT" -log "$LOGGING" -pt "$PHONE_TEST" -ipt "$IPERF_TEST"
 	echo "..."
@@ -86,7 +86,7 @@ IPERF_TEST=("False")
 for j in $(seq 0 "$(("${#SUCCESS_THRESH[@]}"-1))");
 do
 echo "...Testing SUCCESS THRESHOLD: ${SUCCESS_THRESH[$j]}"
-	for i in $(seq 0 10);
+	for i in $(seq 0 9);
 	do
 	python3 NDNsim.py -seed $i -o "$METRICFILE" -ihn "$INT_HYBRID_NAME" -ip "$IP" -port "$PORT" -pip "$PHONE_IP" -pport "$PHONE_PORT" -tp "$TOPFILE" -w "$WEIGHTDIST" -r "$RANGE" -ld "$LINKDIST" -st "${SUCCESS_THRESH[$j]}" -pnco "$PHONE_NODE_CONNECT_ORDER" -v "$VELOCITY" -pgn "$PLTGEN_NUM" -tt "$TOP_THRESH" -l "$LINGER" -d "$DELTA" -to "$TIMEOUT" -log "$LOGGING" -pt "$PHONE_TEST" -ipt "$IPERF_TEST"
 	echo "..."
@@ -116,7 +116,7 @@ IPERF_TEST=("False")
 for j in $(seq 0 "$(("${#LINGER[@]}"-1))");
 do
 echo "...Testing LINGER: ${LINGER[$j]}"
-	for i in $(seq 0 10);
+	for i in $(seq 0 9);
 	do
 	python3 NDNsim.py -seed $i -o "$METRICFILE" -ihn "$INT_HYBRID_NAME" -ip "$IP" -port "$PORT" -pip "$PHONE_IP" -pport "$PHONE_PORT" -tp "$TOPFILE" -w "$WEIGHTDIST" -r "$RANGE" -ld "$LINKDIST" -st "$SUCCESS_THRESH" -pnco "$PHONE_NODE_CONNECT_ORDER" -v "$VELOCITY" -pgn "$PLTGEN_NUM" -tt "$TOP_THRESH" -l "${LINGER[$j]}" -d "$DELTA" -to "$TIMEOUT" -log "$LOGGING" -pt "$PHONE_TEST" -ipt "$IPERF_TEST"
 	echo "..."
@@ -151,7 +151,7 @@ do
 		for j in $(seq 0 "$(("${#TOP_THRESH[@]}"-1))");
 		do
 		echo "...Testing SUCCESS_THRESH | LINGER | TOP_THRESH: ${SUCCESS_THRESH[$l]} | ${LINGER[$k]} | ${TOP_THRESH[$j]}"
-			for i in $(seq 0 10);
+			for i in $(seq 0 9);
 			do
 			python3 NDNsim.py -seed $i -o "$METRICFILE" -ihn "$INT_HYBRID_NAME" -ip "$IP" -port "$PORT" -pip "$PHONE_IP" -pport "$PHONE_PORT" -tp "$TOPFILE" -w "$WEIGHTDIST" -r "$RANGE" -ld "$LINKDIST" -st "${SUCCESS_THRESH[$l]}" -pnco "$PHONE_NODE_CONNECT_ORDER" -v "$VELOCITY" -pgn "$PLTGEN_NUM" -tt "${TOP_THRESH[$j]}" -l "${LINGER[$k]}" -d "$DELTA" -to "$TIMEOUT" -log "$LOGGING" -pt "$PHONE_TEST" -ipt "$IPERF_TEST"
 			echo "..."

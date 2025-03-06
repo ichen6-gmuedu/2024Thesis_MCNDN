@@ -540,8 +540,8 @@ def precache_packet_helper(location: str, node: Node, packet: Packet, new_packet
 	success_thresh_values = list(map(float, success_thresh.split(", "))) #range of values (ie. [.4-.6])
 	success_chance = pow(1-success_thresh_values[1], num_hops) #worst case of failure is upper bounds, 1 minus to get success
 	top_thresh_values = list(map(float, top_thresh[1].split(", ")))
-	top_thresh_roll = distribution_helper(top_thresh[0], top_thresh_values, True)
-
+	top_thresh_roll = distribution_helper(top_thresh[0], top_thresh_values, False)
+	
 	#See if precaching will work via links, or if we send right to the end
 	if success_chance < top_thresh_roll :
 		if logging >= 2:
