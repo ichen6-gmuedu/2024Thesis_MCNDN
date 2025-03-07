@@ -553,7 +553,7 @@ def precache_packet_helper(location: str, node: Node, packet: Packet, new_packet
 		next_hop = new_destination	
 		
 	#Logging and incrementing globals
-	if logging == 3:
+	if logging >= 2:
 		if location == "cache":
 			print("Precaching from cache! Probability of successful delivery: "+str(success_chance))
 		else:
@@ -1520,6 +1520,7 @@ Velocity_dist,\
 Velocity, \
 Pktgen_num, \
 Top_thresh, \
+MC_reconn_time, \
 Linger_dist, \
 Linger, \
 Delta_dist, \
@@ -1546,6 +1547,7 @@ total_delay, timeout_counter, linger_timeout_counter, delta_timeout_counter, int
 	 "\", \"" +str(velocity)+\
 	 "\", \"" +str(args.pktgen_num)+\
 	 "\", \"" +str(args.top_thresh)+\
+	 "\", \"" +str(args.MC_reconn_time)+\
 	 "\", \"" +str(args.linger)+\
 	 "\", \"" +str(linger)+\
 	 "\", \"" +args.delta+ "\", \"" +str(delta)+\

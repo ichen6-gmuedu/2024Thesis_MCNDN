@@ -132,6 +132,7 @@ The program NDNsim.py contains 16 arguments for the NDN simulator.
 | -v, --velocity	| 'uniform:0, 2'	| distribution:distrubution values | The probability distribution of MC's velocity at each gateway connection. Eg, the default: "uniform:0, 2" means that at each node the mobile consumer is connecting to, they are travelling at a speed chosen by the uniform probability distribution between 0 and 2. |
 | -pgn, --pktgen_num	| 5	| number of packets to generate | When generating dummy data, determines how many data packets to generate. |
 | -tt, --top_thresh	| 'uniform:0, 0.01'	| distribution:distrubution values | The threshold that determines whether a packet will be precached through the topology or through the infrastructure. Eg, "uniform:0, 0.5" means that if the probability of link failure on the link path from the current location to the destination node (based on the link failure distribution) is less than a value between 0.0 and 0.5 (chosen by the uniform distribution), then the packet	will be delivered through the topology instead of the infrastructure. |
+| -mrt, -MC_reconn_time | distribution:distrubution values  | The probability distribution that determines the amount of time between after a linger timeout has occurred and the MC reconnects to the next node. |
 | -l, --linger	| 'uniform:1, 5'	| distribution:distrubution values | The probability distribution for MC's linger time at each gateway connection. Eg: "uniform:0, 0.5" means that at each node the mobile consumer is connecting to, they are in range of that node for x seconds as determined by the uniform probability distribution between 0 and 0.5. |
 | -d, --delta	| '3:uniform:1, 5' | amount to generate: distribution: distrubution values | The probability distribution of deadline in seconds before the data expires. Eg: "3:uniform:0, 0.5" means that the data packet must be received by the MC before the amount of seconds selected by the uniform probability distribution, between 0-0.5, before the MC moves and the interest is re-sent. This happens again 2 more times. |
 | -to, --timeout	| 5	| value | Deadline to resend for packets if you dont receive in timeout amount of seconds. timeout scenario: data packet is dropped before delta/linger has expired, we want to resend so we might be able to get the data before delta/linger expires. |
@@ -324,14 +325,15 @@ The output file is `metric_outfile.csv` by default and records the inputs of the
 | Topfile | filename | The file to read in the topology of the NDN system. |
 | Weight_dist | distribution inputs | Probability distirbution and inputs that determines the weights (transmission rates) of each link in the topology. |
 | Range_dist | distribution inputs  | Probability distirbution and inputs that determines the transmission arnge of each node in the topology. |
-| Failure_dist | distribution inputs | Probability distirbution and inputs that determines whether a link will faill to transmit data. |
-| Failure_range | distribution inputs | Probability distirbution and inputs that determines the threshold that failure_dist must surpass in order to successfully transmit data. |
+| Link_dist | distribution inputs | Probability distirbution and inputs that determines whether a link will faill to transmit data. |
+| Success_thresh | distribution inputs | Probability distirbution and inputs that determines the threshold that Link_dist must surpass in order to successfully transmit data. |
 | Phone_node_connect_order_dist | distribution inputs | Probability distirbution and inputs that determines the connect order of the mobile consumer. |
 | Phone_node_connect_order | list of ints | The resulting list of nodes (represented by ints) that the mobile consumer will connect to. |
 | Velocity_dist | distribution inputs | Probability distirbution and inputs that determines the velocity of the mobile consumer at each connection to a node in the topology. |
 | Velocity | list of floats | The resulting velocities of the mobile consumer at each connection to the topology. |
 | Pktgen_num | int | The number of packets to generate if iperf3 test is not activated. Filled with incrementing ints. |
-| Precache_dist | distribution inputs | Probability distirbution and inputs that determines the threshold that the calculation for probability of successful delivery must surpass in order to proactively deliver through the topology instead of through the infrastructure. |
+| Top_thresh | distribution inputs | Probability distirbution and inputs that determines the threshold that the calculation for probability of successful delivery must surpass in order to proactively deliver through the topology instead of through the infrastructure. |
+| MC_reconn_time | distribution inputs  | The probability distribution that determines the amount of time between after a linger timeout has occurred and the MC reconnects to the next node. |
 | Linger_dist | distribution inputs  | Probability distirbution and inputs that determines the linger time of the mobile consumer at each connection to a node in the topology. |
 | Linger | list of floats | The resulting list of linger times of the mobile consumer at each connection in seconds. |
 | Delta_dist | distribution inputs | Probability distirbution and inputs that determines the delta timeout of the interest packet. |
